@@ -1,6 +1,6 @@
 // 式が見える電卓：オフライン用のキャッシュ
 // ファイルを更新したら CACHE の番号を上げると、次の起動で新しい版に入れ替わる
-const CACHE = "calc-v4";
+const CACHE = "calc-v5";
 const FILES = [
   "./",
   "./index.html",

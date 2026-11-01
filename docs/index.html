@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#192026" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="式電卓">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>式が見える電卓</title>
+<style>
+/* ページの土台：画面の上下の安全領域（ノッチやホームバー）を避け、ページ全体はスクロールさせない */
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{overflow:hidden;overscroll-behavior:none}
+body{margin:0;font:14px/1.5 system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%}
+img{max-width:100%}
+</style>
+</head>
+<body>
+<style>
+/* Layout: one-screen app. History tape fills the top, the expression line sits under it, 4x5 keypad pinned to the bottom. */
+:root{
+  --bg:#eef0f2; --panel:#ffffff; --key:#ffffff; --key-op:#e3e9ee; --fg:#1d2730; --muted:#6c7a86;
+  --accent:#0f6e74; --accent-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,"Noto Sans JP",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
+  --accent:#2fa7ac; --accent-fg:#06191a; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
+  --accent:#2fa7ac; --accent-fg:#06191a; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--panel);color:var(--fg);font-family:var(--sans);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+.app{height:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:4px;padding-block:12px 16px;box-sizing:border-box}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;
+  padding:8px 0}
+.history{flex:1 1 0;min-height:0;overflow-y:auto;margin-inline:-4px;display:flex;flex-direction:column;gap:6px;
+  font-family:var(--mono);font-size:20px;color:var(--muted);text-align:right}
+.history .row{overflow-wrap:anywhere}
+.history>.row:first-child{margin-top:auto}
+.history .ex{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;text-align:right;
+  cursor:pointer;border-radius:6px;overflow-wrap:anywhere}
+.history .ex:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.history .row{border-radius:8px;padding:2px 4px;cursor:pointer}
+.history .row.editing{background:var(--ref-bg);color:var(--fg)}
+.history .tail{display:inline-block;white-space:nowrap;max-width:100%}
+.history .ans{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);font:400 20px var(--mono);
+  display:inline-block;line-height:1.3;vertical-align:baseline;border-radius:7px;padding:0 6px;cursor:pointer}
+.history .ans:active{filter:brightness(.92)}
+.history .ans:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.history .ans.off{opacity:.45;cursor:default}
+.history .ans.bad{color:var(--err);font-family:var(--sans);font-size:15px;cursor:default}
+.history .row.changed .ans{animation:flash 1.4s ease-out}
+@keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
+.ref{display:inline-block;line-height:1.3;vertical-align:baseline;background:var(--ref-bg);color:var(--accent);
+  border:1px solid transparent;border-radius:7px;padding:0 6px;font-weight:400}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;height:30px}
+.label.editing #exprLabel{color:var(--accent);font-weight:700}
+.lab-right{display:flex;align-items:center;gap:8px}
+#parenInfo.warn{color:var(--err);letter-spacing:0}
+.editbar{display:flex;align-items:center;gap:6px}
+.editbar button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;
+  height:28px;padding:0 12px;line-height:1;font:700 13px var(--sans);cursor:pointer}
+.editbar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.editbar .del{background:var(--err);border-color:var(--err);color:var(--panel)}
+.expr{flex:0 0 auto;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
+  font-family:var(--mono);font-size:20px;line-height:1.5;text-align:right;overflow-wrap:anywhere;
+  border-top:1px solid var(--line);padding-top:8px}
+.expr>.line{display:block}
+.expr .ghost{color:var(--ghost)}
+.expr .tok{cursor:text;border-radius:4px}
+.expr .tok.sel{background:var(--ref-bg);outline:2px solid var(--accent);outline-offset:0}
+.expr .tok.sel .ref{background:none}
+.expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.expr .cur,.history .row.changed .ans{animation:none}}
+.result{display:inline;font-family:var(--mono);font-weight:500;font-size:20px;
+  font-variant-numeric:tabular-nums;color:var(--muted);transition:color .15s}
+.result.final{color:var(--fg)}
+.result.err{color:var(--err);font-family:var(--sans);font-size:15px;font-weight:500;margin-left:8px}
+/* テンキーの段だけグレーの帯にして、画面の左右と下の端まで広げる */
+.keyarea{display:flex;flex-direction:column;touch-action:none;flex:none;padding-top:2px;
+  background:var(--bg);box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax -100vmax -100vmax)}
+.grip{flex:none;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.grip::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--ghost)}
+.grip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:6px}
+.keys-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .28s ease,opacity .2s ease}
+.keys-wrap.hidden{grid-template-rows:0fr;opacity:0}
+.keys-wrap.hidden>.keys{padding-block:0}
+@media (prefers-reduced-motion:reduce){.keys-wrap{transition:none}}
+body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
+.keys{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;min-height:0;overflow:hidden;padding:2px}
+.keys button{appearance:none;border:1px solid var(--line);background:var(--key);color:var(--fg);border-radius:16px;
+  height:clamp(42px,6.8vh,54px);font-family:var(--mono);font-size:21px;cursor:pointer;touch-action:manipulation;transition:transform .06s,filter .06s}
+.keys button:active{transform:scale(.95);filter:brightness(.92)}
+.keys button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.keys .op{background:var(--key-op);font-size:23px}
+.keys .zeros{font-size:18px}
+#k-pct,#k-neg{font-size:19px}
+.keys .blank{display:block}
+.keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
+.keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(10,16,20,.45);display:flex;align-items:center;justify-content:center;
+  padding:24px max(24px,env(safe-area-inset-right,0px)) 24px max(24px,env(safe-area-inset-left,0px))}
+.dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:18px;padding:20px;width:100%;max-width:320px;
+  display:flex;flex-direction:column;gap:8px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.m-title{margin:0;font-size:17px;font-weight:700}
+.m-body{margin:0;font-size:14px;color:var(--muted);line-height:1.6}
+.m-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.m-actions button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:12px;height:44px;
+  font:700 15px var(--sans);cursor:pointer}
+.m-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.m-actions .danger{background:var(--err);border-color:var(--err);color:var(--panel)}
+</style>
+
+<div class="app">
+  <section class="screen" aria-live="polite">
+    <div class="history" id="history"></div>
+    <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="editbar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
+    <div class="expr" id="expr"><span class="line"><span id="exprText"></span><span class="result" id="result"></span></span></div>
+  </section>
+  <div class="keyarea" id="keyarea">
+  <div class="grip" id="grip" role="button" tabindex="0" aria-label="テンキーを隠す"></div>
+  <div class="keys-wrap" id="keysWrap">
+  <div class="keys" id="keys">
+    <button class="fn" data-k="C" id="k-c">AC</button>
+    <button class="fn" data-k="⌫" id="k-bs" aria-label="1文字消す">⌫</button>
+    <button class="op" data-k="(" id="k-lp">(</button>
+    <button class="op" data-k=")" id="k-rp">)</button>
+    <button class="op" data-k="÷" id="k-div">÷</button>
+    <button class="op" data-k="%" id="k-pct">%</button>
+    <button data-k="7" id="k7">7</button><button data-k="8" id="k8">8</button><button data-k="9" id="k9">9</button>
+    <button class="op" data-k="×" id="k-mul">×</button>
+    <button class="op" data-k="±" id="k-neg" aria-label="符号を切り替える">±</button>
+    <button data-k="4" id="k4">4</button><button data-k="5" id="k5">5</button><button data-k="6" id="k6">6</button>
+    <button class="op" data-k="−" id="k-sub">−</button>
+    <span class="blank" aria-hidden="true"></span>
+    <button data-k="1" id="k1">1</button><button data-k="2" id="k2">2</button><button data-k="3" id="k3">3</button>
+    <button class="op" data-k="+" id="k-add">+</button>
+    <button class="zeros" data-k="000" id="k000">000</button>
+    <button class="zeros" data-k="00" id="k00">00</button>
+    <button data-k="0" id="k0">0</button>
+    <button data-k="." id="k-dot">.</button>
+    <button class="eq" data-k="=" id="k-eq">=</button>
+  </div>
+  </div>
+  </div>
+</div>
+
+<div class="scrim" id="modal" hidden>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="m-title" aria-describedby="m-body">
+    <p class="m-title" id="m-title">履歴をすべて消しますか？</p>
+    <p class="m-body" id="m-body"></p>
+    <div class="m-actions">
+      <button id="m-cancel">キャンセル</button>
+      <button id="m-ok" class="danger">履歴を消す</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* 式の中で過去の答えは「[行ID]」という参照として持つ。
+   行を編集すると、その答えを参照している行を上から順に計算し直す。 */
+const OPS = ["+","−","×","÷"];
+const LIMIT = 200;
+let expr = "";        // 入力中の式
+let done = false;     // = を押した直後か
+let history = [];     // {id, e:式, v:答え}
+let nextId = 1;
+let editing = null;   // 編集中の行のID
+let lastKey = null;
+let lastId = null;    // 直前に確定した行
+let pos = 0;          // カーソル位置
+let sel = null;       // 選択中の数字 {a,b}
+const flash = new Set();
+let scrollToEnd = true;  // 新しい行が増えたときだけ、履歴をいちばん下まで送る
+
+const $ = id => document.getElementById(id);
+const last = () => expr.slice(-1);
+const isDigit = c => /[0-9]/.test(c);
+const endsOperand = c => isDigit(c) || c===")" || c==="]" || c==="." || c==="%";
+const opens = s => [...s].reduce((n,c)=> c==="(" ? n+1 : c===")" ? n-1 : n, 0);
+const byId = id => history.find(h=>h.id===id);
+const idxOf = id => history.findIndex(h=>h.id===id);
+
+/* ---- 保存（この端末のブラウザ内） ---- */
+const STORE="calc-history-v2", OLD="calc-history-v1";
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify({nextId, history})); }catch(e){} }
+function load(){
+  try{
+    const raw=localStorage.getItem(STORE);
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d && Array.isArray(d.history)){
+        history=d.history.filter(x=>x&&typeof x.e==="string"&&Number.isInteger(x.id));
+        nextId=Math.max(d.nextId|0, 1, ...history.map(h=>h.id+1));
+      }
+    } else {
+      const a=JSON.parse(localStorage.getItem(OLD)||"[]");
+      if(Array.isArray(a)) history=a.filter(x=>x&&typeof x.e==="string").slice(-LIMIT).map(x=>({id:nextId++, e:x.e, v:x.v}));
+    }
+  }catch(e){}
+  recalc(false);
+  // 上限を超えていたら古い行から消す（参照している式は数字に置き換える）
+  if(history.length>LIMIT){ while(history.length>LIMIT) removeRow(history[0].id); recalc(false); save(); }
+}
+
+/* ---- 計算（evalは使わず、自前で式を解析） ---- */
+function tokenize(s){
+  const t=[]; let i=0;
+  while(i<s.length){
+    const c=s[i];
+    if(isDigit(c)||c==="."){ let j=i; while(j<s.length&&(isDigit(s[j])||s[j]===".")) j++;
+      const n=s.slice(i,j); if(n===".") throw "式が途中です"; t.push(parseFloat(n)); i=j; }
+    else if(c==="["){ const j=s.indexOf("]",i); const h=byId(+s.slice(i+1,j));
+      if(!h) throw "参照先がありません"; if(!isFinite(h.v)) throw "参照先がエラーです";
+      t.push(h.v); i=j+1; }
+    else { t.push(c); i++; }
+  }
+  return t;
+}
+function evaluate(s){
+  const t=tokenize(s); let p=0;
+  const expect=()=>{ if(p>=t.length) throw "式が途中です"; };
+  // 足し算・引き算の右側が「10%」だけなら、左側の10%を足し引きする（200+10% = 220）
+  function sum(){ let v=term().v;
+    while(t[p]==="+"||t[p]==="−"){ const o=t[p++]; const r=term();
+      const d = r.pct ? v*r.v : r.v;
+      v = addRound(v, o==="+" ? d : -d); }
+    return v; }
+  function term(){ const f=factor(); let v=f.v, pcts=f.pct?1:0;
+    while(true){
+      let o=t[p];
+      if(o==="×"||o==="÷") p++;
+      else if(typeof o==="number"||o==="(") o="×";   // 2(3) や (2)(3) は掛け算とみなす
+      else break;
+      const r=factor(); if(r.pct) pcts++;
+      if(o==="÷"&&r.v===0) throw "0では割れません";
+      v = o==="×" ? v*r.v : v/r.v;
+    }
+    return {v, pct:pcts===1}; }   // 10%×2 のように%が1つだけの項は「20%」として扱う
+  // 10% は単独なら 0.1、掛け算・割り算では 10/100 として使う
+  function factor(){ const v=unary(); if(t[p]==="%"){ p++; return {v:v/100, pct:true}; } return {v, pct:false}; }
+  function unary(){ expect(); if(t[p]==="−"){ p++; return -unary(); } return atom(); }
+  function atom(){ expect(); const x=t[p++];
+    if(typeof x==="number") return x;
+    if(x==="("){ const v=sum(); if(t[p]!==")") throw "式が途中です"; p++; return v; }
+    throw "式が途中です"; }
+  const v=sum(); if(p!==t.length) throw "式が途中です";
+  return v;
+}
+// 2進数の誤差を消すため、足し算・引き算の答えを元の数の桁で丸める（有効15桁）
+function addRound(a,b){
+  const v=a+b, m=Math.max(Math.abs(a),Math.abs(b));
+  if(!isFinite(v)||m===0) return v;
+  const d=14-Math.floor(Math.log10(m));
+  if(d<0||d>100) return v;
+  return Number(v.toFixed(d));
+}
+function clean(v){ return parseFloat(v.toPrecision(15)); }
+function fmt(v){
+  if(!isFinite(v)) return "エラー";
+  const c=clean(v), sign = c<0 ? "−" : "", a=Math.abs(c);
+  if(a>=1e16||(a!==0&&a<1e-9)) return sign+a.toExponential(6).replace("e+","e").replace(/\.?0+e/,"e");
+  return sign+a.toLocaleString("en-US",{maximumSignificantDigits:15});
+}
+// 式に書ける形の数字（マイナスは括弧付き）
+function numLit(v){
+  const s=Math.abs(clean(v)).toLocaleString("en-US",{useGrouping:false,maximumSignificantDigits:15});
+  return v<0 ? "(−"+s+")" : s;
+}
+
+/* ---- 履歴の再計算・追加・削除 ---- */
+function recalc(mark){
+  for(const h of history){
+    const old=h.v; let v;
+    try{ v=evaluate(h.e); }catch(e){ v=NaN; }
+    if(!isFinite(v)) v=NaN;
+    h.v=v;
+    if(mark && !Object.is(old,v)) flash.add(h.id);
+  }
+}
+// 消える行を参照している式は、その時点の数字に置き換える
+function freeze(id){
+  const h=byId(id); if(!h||!isFinite(h.v)) return;
+  const lit=numLit(h.v), tag="["+id+"]";
+  for(const x of history) if(x.id!==id) x.e=x.e.split(tag).join(lit);
+  setExpr(expr.split(tag).join(lit));
+}
+function removeRow(id){ freeze(id); const i=idxOf(id); if(i>=0) history.splice(i,1); }
+function pushRow(e,v){
+  const id=nextId++;
+  history.push({id,e,v});
+  while(history.length>LIMIT) removeRow(history[0].id);
+  return id;
+}
+
+/* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
+function setExpr(v){ expr=v; pos=v.length; sel=null; }
+function press(k){
+  if(!$("modal").hidden) return;
+  const prevKey=lastKey; lastKey=k;
+  // 入力欄が空のときのACは、履歴をすべて消す確認を出す（行の編集中は除く）
+  if(k==="C" && expr==="" && editing===null && history.length){ openModal(); return; }
+  if(k==="="){ sel=null; return equals(); }
+  if(k==="C"){ setExpr(""); done=false; return render(); }
+  if(done){
+    // ＝の直後に演算子を押すと、直前の答えを参照して続ける
+    if((OPS.includes(k)||k==="%"||k==="±") && expr==="" && byId(lastId)) setExpr("["+lastId+"]");
+    done=false;
+  }
+  if(k==="±"){ toggleSign(); return render(); }
+  let b, a;
+  if(sel){
+    // 選択中の数字は、数字を打つと置き換わり、⌫で丸ごと消える
+    if(isDigit(k)||k==="."||k==="⌫"){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); }
+    else { b=expr.slice(0,sel.b); a=expr.slice(sel.b); }
+    sel=null;
+    if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
+  } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  // 00・000 は 0 を続けて打ったのと同じ
+  const nb = (k==="00"||k==="000") ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
+  if(nb!==null){ expr=nb+(k==="⌫"?"":joinRight(nb,a))+a; pos=nb.length; }
+  render();
+}
+// ± ：カーソルのある数字（または選択中の数字）の符号を切り替える
+function toggleSign(){
+  let q=pos;
+  if(!sel && expr[q-1]===")" && /\(−[0-9.]+%?\)$|\(−\[\d+\]%?\)$/.test(expr.slice(0,q))) q--;   // (−5) の直後
+  if(!sel && expr[q-1]==="%") q--;
+  const tk = sel ? {a:sel.a,b:sel.b} : exprTokens(expr).find(t=>(t.k==="num"||t.k==="ref") && t.a<q && q<=t.b);
+  if(!tk){
+    // 数字を打つ前なら、マイナスの数を打ち始める
+    const b=expr.slice(0,pos), a=expr.slice(pos), L=b.slice(-1);
+    if(b===""||L==="("){ expr=b+"−"+a; pos=b.length+1; }
+    else if(OPS.includes(L)){ expr=b+"(−"+a; pos=b.length+2; }
+    return;
+  }
+  const X=expr.slice(tk.a,tk.b), pre=expr.slice(0,tk.a), post=expr.slice(tk.b);
+  let na, wrapped=false;
+  if(pre.endsWith("(−") && post.startsWith(")")){ expr=pre.slice(0,-2)+X+post.slice(1); na=tk.a-2; }
+  else if(pre.endsWith("−") && (pre.length===1 || pre.slice(-2,-1)==="(")){ expr=pre.slice(0,-1)+X+post; na=tk.a-1; }
+  else if(pre===""||pre.endsWith("(")){ expr=pre+"−"+X+post; na=tk.a+1; }
+  else { expr=pre+"(−"+X+")"+post; na=tk.a+2; wrapped=true; }
+  const end=na+X.length;
+  if(sel){ sel={a:na,b:end}; pos=end; }
+  else pos = end + (wrapped?1:0) + (expr[end+(wrapped?1:0)]==="%" && q<pos ? 1 : 0);
+}
+function joinRight(b,a){
+  const L=b.slice(-1), R=a.charAt(0);
+  if((L===")"||L==="]"||L==="%") && (isDigit(R)||R==="."||R==="("||R==="[")) return "×";
+  if((isDigit(L)||L===".") && (R==="("||R==="[")) return "×";
+  return "";
+}
+// カーソルより前の部分 b に、キー k を打ったときの新しい b を返す（何もしないなら null）
+function applyKey(b,a,k){
+  const L=b.slice(-1);
+  const curNum=()=>b.match(/[0-9.]*$/)[0];
+  if(isDigit(k)){
+    if(L===")"||L==="]"||L==="%") b+="×";
+    if(curNum()==="0") b=b.slice(0,-1);   // 先頭の0を置き換え
+    return b+k;
+  }
+  if(k==="."){
+    if(L===")"||L==="]"||L==="%") b+="×";
+    if((curNum()+a.match(/^[0-9.]*/)[0]).includes(".")) return null;
+    return b+(curNum()===""?"0.":".");
+  }
+  if(OPS.includes(k)){
+    if(b===""||L==="(") return k==="−" ? b+"−" : null;  // 先頭・括弧の直後はマイナスだけ
+    if(L===".") b=b.slice(0,-1);
+    if(OPS.includes(b.slice(-1))){
+      const prev=b.slice(-2,-1);
+      if(prev==="("||b.length===1) return null;   // 「(−」の−は置き換えない
+      b=b.slice(0,-1);
+    }
+    return b+k;
+  }
+  if(k==="%"){
+    if(b===""||L==="("||L==="%"||OPS.includes(L)) return null;
+    if(L===".") b=b.slice(0,-1);
+    return b+"%";
+  }
+  if(k==="("){
+    if(endsOperand(L)){ if(L===".") b=b.slice(0,-1); b+="×"; }
+    return b+"(";
+  }
+  if(k===")"){
+    if(opens(b)<=0||L==="("||OPS.includes(L)) return null;
+    if(L===".") b=b.slice(0,-1);
+    return b+")";
+  }
+  if(k==="⌫") return L==="]" ? b.replace(/\[\d+\]$/,"") : b.slice(0,-1);
+  return null;
+}
+function equals(){
+  if(!expr) return;
+  let s=expr;
+  while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
+  if(!s) return;
+  s+=")".repeat(Math.max(0,opens(s)));
+  let v; try{ v=evaluate(s); }catch(e){ showError(e); return; }
+  if(!isFinite(v)){ showError("桁が大きすぎます"); return; }
+  let id;
+  if(editing!==null){
+    const h=byId(editing); h.e=s; id=h.id; editing=null;
+    recalc(true); flash.add(id);
+  } else {
+    id=pushRow(s,v); scrollToEnd=true;
+  }
+  save();
+  setExpr(""); lastId=id;
+  done=true;
+  render();
+}
+function showError(msg){ const r=$("result"); r.className="result err"; r.textContent=msg; }
+
+/* ---- 行の編集 ---- */
+function startEdit(id){
+  editing=id; setExpr(byId(id).e); done=false; lastKey=null; render();
+}
+function cancelEdit(){ editing=null; setExpr(""); done=false; lastKey=null; render(); }
+function deleteEditing(){
+  const id=editing; editing=null; removeRow(id); recalc(true); save();
+  setExpr(""); done=false; lastKey=null; render();
+}
+// 過去の答えを参照として式に入れる（編集中は、その行より上の答えだけ）
+function insertRef(id){
+  lastKey=null;
+  done=false;
+  let b,a;
+  if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  const L=b.slice(-1);
+  if(endsOperand(L)){ if(L===".") b=b.slice(0,-1); b+="×"; }
+  b+="["+id+"]"; expr=b+joinRight(b,a)+a; pos=b.length; render();
+}
+
+/* ---- 表示 ---- */
+function esc(s){ return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function pretty(s){
+  return esc(s).replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return `<span class="ref">${h&&isFinite(h.v)?fmt(h.v):"?"}</span>`; });
+}
+function exprTokens(s){
+  const t=[]; let i=0;
+  while(i<s.length){ const c=s[i];
+    if(isDigit(c)||c==="."){ let j=i; while(j<s.length&&(isDigit(s[j])||s[j]===".")) j++; t.push({k:"num",a:i,b:j}); i=j; }
+    else if(c==="["){ const j=s.indexOf("]",i)+1; t.push({k:"ref",a:i,b:j}); i=j; }
+    else { t.push({k:"sym",a:i,b:i+1}); i++; }
+  }
+  return t;
+}
+function liveExprHtml(){
+  const cur='<span class="cur"></span>';
+  let html = (!sel && pos===0) ? cur : "";
+  for(const tk of exprTokens(expr)){
+    const txt=expr.slice(tk.a,tk.b);
+    let inner;
+    if(tk.k==="ref"){ const h=byId(+txt.slice(1,-1)); inner=`<span class="ref">${h&&isFinite(h.v)?fmt(h.v):"?"}</span>`; }
+    else if(!sel && pos>tk.a && pos<tk.b){ inner=esc(txt.slice(0,pos-tk.a))+cur+esc(txt.slice(pos-tk.a)); }
+    else inner=esc(txt);
+    const on = sel && sel.a===tk.a && sel.b===tk.b;
+    html+=`<span class="tok k-${tk.k}${on?" sel":""}" data-a="${tk.a}" data-b="${tk.b}">${inner}</span>`;
+    if(!sel && pos===tk.b && pos>0) html+=cur;
+  }
+  return html;
+}
+function render(finishedExpr, finishedVal){
+  if(pos>expr.length||pos<0) pos=expr.length;
+  const h=$("history");
+  const editIdx = editing===null ? history.length : idxOf(editing);
+  h.innerHTML=history.map((x,i)=>{
+    const ans = !isFinite(x.v) ? `<span class="ans bad">エラー</span>`
+      : i<editIdx ? `<button class="ans" data-id="${x.id}" id="ans-${x.id}" aria-label="${fmt(x.v)} を式に入れる">${fmt(x.v)}</button>`
+      : `<span class="ans off">${fmt(x.v)}</span>`;
+    const cls = "row"+(x.id===editing?" editing":"")+(flash.has(x.id)?" changed":"");
+    return `<div class="${cls}" data-id="${x.id}"><button class="ex" data-id="${x.id}" id="ex-${x.id}" aria-label="この行を編集">${pretty(x.e)}</button><span class="tail">=${ans}</span></div>`;
+  }).join("");
+  flash.clear();
+  if(scrollToEnd){ h.scrollTop=h.scrollHeight; scrollToEnd=false; }
+  $("editBar").hidden = editing===null;
+  $("exprLabel").textContent = editing===null ? "式" : "行を編集";
+  $("exprLabel").parentNode.classList.toggle("editing", editing!==null);
+
+  const r=$("result");
+  if(finishedExpr!==undefined){
+    $("exprText").innerHTML = pretty(finishedExpr)+"=";
+    r.className="result final"; r.textContent=fmt(finishedVal);
+    $("parenInfo").textContent="";
+    return;
+  }
+  const open=opens(expr);
+  $("exprText").innerHTML = liveExprHtml() + `<span class="ghost">${")".repeat(Math.max(0,open))}</span>`;
+  if(pos===expr.length) $("expr").scrollTop = $("expr").scrollHeight;
+  const full = editing===null && expr!=="" && history.length>=LIMIT;
+  $("parenInfo").textContent = full ? `上限${LIMIT}件です。確定すると最古の行が消えます。`
+    : open>0 ? `閉じていない括弧 ${open}` : "";
+  $("parenInfo").classList.toggle("warn", full);
+  const v=preview();
+  if(v===null){ r.className="result"; r.textContent=""; }
+  else if(typeof v==="string"){ if(v==="0では割れません"){ r.className="result err"; r.textContent=v; } else { r.className="result"; r.textContent=""; } }
+  else { r.className="result"; r.textContent="="+fmt(v); }
+}
+// 途中の式でも答えを先に見せる：末尾の演算子を外し、閉じ括弧を補う
+function preview(){
+  let s=expr;
+  while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
+  if(!s) return null;
+  s+=")".repeat(Math.max(0,opens(s)));
+  try{ return evaluate(s); }catch(e){ return e; }
+}
+
+/* ---- 全消去の確認 ---- */
+function openModal(){
+  $("m-body").textContent=`${history.length}件の計算履歴が消えます。元には戻せません。`;
+  $("modal").hidden=false; $("m-cancel").focus();
+}
+function closeModal(){ $("modal").hidden=true; lastKey=null; }
+$("m-cancel").addEventListener("click",closeModal);
+$("m-ok").addEventListener("click",()=>{ history=[]; editing=null; save(); setExpr(""); done=false; closeModal(); render(); });
+$("modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
+
+/* ---- 操作 ---- */
+$("history").addEventListener("click",e=>{
+  const a=e.target.closest("button.ans"); if(a){ insertRef(+a.dataset.id); return; }
+  const x=e.target.closest(".row"); if(x){ startEdit(+x.dataset.id); }
+});
+// 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
+$("expr").addEventListener("click",e=>{
+  if(!$("modal").hidden||suppressClick) return;
+  if(keysHidden) setKeys(false);    // 隠れているときに式をタップしたらテンキーを戻す
+  done=false;
+  lastKey=null;
+  const t=e.target.closest(".tok");
+  if(t){
+    const a=+t.dataset.a, b=+t.dataset.b;
+    if(t.classList.contains("k-sym")){
+      const r=t.getBoundingClientRect(); sel=null; pos = e.clientX < r.left+r.width/2 ? a : b;
+    } else if(sel && sel.a===a && sel.b===b){ sel=null; pos=b; }
+    else { sel={a,b}; pos=b; }
+  } else {
+    const first=$("exprText").querySelector(".tok");
+    const r=first && first.getBoundingClientRect();
+    pos = (r && e.clientX<r.left && e.clientY<r.bottom) ? 0 : expr.length;
+    sel=null;
+  }
+  render();
+});
+/* ---- テンキーを隠す・戻す ---- */
+let keysHidden=false, suppressClick=false, swipeStart=null;
+function setKeys(hide){
+  if(keysHidden===hide) return;
+  keysHidden=hide;
+  $("keysWrap").classList.toggle("hidden",hide);
+  document.body.classList.toggle("keys-hidden",hide);
+  $("grip").setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
+}
+// テンキーの上で下へ、または式の欄で上へ、はっきり動かしたときだけ反応する
+function watchSwipe(el, onSwipe){
+  el.addEventListener("pointerdown",e=>{ swipeStart={x:e.clientX, y:e.clientY, on:onSwipe}; });
+}
+window.addEventListener("pointerup",e=>{
+  const st=swipeStart; swipeStart=null; if(!st) return;
+  const dy=e.clientY-st.y, dx=e.clientX-st.x;
+  if(Math.abs(dy)>45 && Math.abs(dy)>Math.abs(dx)*1.5 && st.on(dy>0?"down":"up")){
+    suppressClick=true; setTimeout(()=>{ suppressClick=false; },350);
+  }
+});
+window.addEventListener("pointercancel",()=>{ swipeStart=null; });
+watchSwipe($("keyarea"), d=>{
+  if(d==="up"&&keysHidden){ setKeys(false); return true; }
+  return false;
+});
+// 隠すときは指に合わせてテンキーを下へ動かす。離した位置と速さで、隠すか戻すかを決める
+let drag=null;
+$("keyarea").addEventListener("pointerdown",e=>{
+  if(keysHidden) return;
+  drag={x:e.clientX, y:e.clientY, py:e.clientY, pt:performance.now(), vy:0, H:$("keysWrap").offsetHeight, active:false};
+});
+window.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const dy=e.clientY-drag.y, dx=e.clientX-drag.x, w=$("keysWrap");
+  if(!drag.active){
+    if(dy>10 && dy>Math.abs(dx)*1.5){ drag.active=true; w.style.transition="none"; }
+    else if(Math.abs(dx)>14||dy<-14){ drag=null; return; }
+    else return;
+  }
+  const now=performance.now();
+  drag.vy=(e.clientY-drag.py)/Math.max(1,now-drag.pt); drag.py=e.clientY; drag.pt=now;
+  w.style.height=Math.max(0, drag.H-Math.max(0,dy))+"px";
+});
+function endDrag(e, cancel){
+  const d=drag; drag=null;
+  if(!d||!d.active) return;
+  suppressClick=true; setTimeout(()=>{ suppressClick=false; },350);
+  const dy=e.clientY-d.y;
+  const hide=!cancel && (dy>d.H*0.35 || d.vy>0.5);
+  const w=$("keysWrap");
+  w.style.transition="height .2s ease-out";
+  void w.offsetHeight;
+  w.style.height = hide ? "0px" : d.H+"px";
+  let finished=false;
+  const finish=()=>{
+    if(finished) return; finished=true;
+    w.style.transition="none";
+    if(hide) setKeys(true);
+    w.style.height="";
+    void w.offsetHeight;
+    w.style.transition="";
+  };
+  w.addEventListener("transitionend",finish,{once:true});
+  setTimeout(finish,260);
+}
+window.addEventListener("pointerup",e=>endDrag(e,false));
+window.addEventListener("pointercancel",e=>endDrag(e,true));
+const showOnUp = d=>{ if(d==="up"&&keysHidden){ setKeys(false); return true; } return false; };
+watchSwipe($("expr"), showOnUp);
+watchSwipe(document.querySelector(".label"), showOnUp);
+$("grip").addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
+$("grip").addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
+$("e-cancel").addEventListener("click",cancelEdit);
+$("e-del").addEventListener("click",deleteEditing);
+$("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });
+document.addEventListener("keydown",e=>{
+  if(!$("modal").hidden){ if(e.key==="Escape") closeModal(); return; }
+  const map={"+":"+","-":"−","*":"×","/":"÷","%":"%","Enter":"=","=":"=","Backspace":"⌫","Escape":"C","(":"(",")":")",".":"."};
+  const k = /^[0-9]$/.test(e.key) ? e.key : map[e.key];
+  if(k){ e.preventDefault(); press(k); }
+});
+
+load();
+render();
+</script>
+
+<script>
+// オフラインでも起動できるように、ファイルを端末に保存する仕組みを登録する
+if("serviceWorker" in navigator){
+  addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+</script>
+</body>
+</html>

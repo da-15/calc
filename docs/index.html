@@ -19,6 +19,8 @@
 :root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
 html,body{overflow:hidden;overscroll-behavior:none}
+/* 画面の上下の余白（ステータスバーとホームバーの部分）：上は表示部分の色、下はテンキーの帯の色 */
+html{background:linear-gradient(to bottom,var(--panel) 50%,var(--bg) 50%)}
 body{margin:0;font:14px/1.5 system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%}
 img{max-width:100%}
 </style>

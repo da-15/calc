@@ -1,6 +1,7 @@
 // 式が見える電卓：オフライン用のキャッシュ
 // ファイルを更新したら CACHE の番号を上げると、次の起動で新しい版に入れ替わる
-const CACHE = "calc-v5";
+// アイコンを差し替えたときは、index.html と manifest の「?v=」の番号も上げる（端末が古い画像を覚えているため）
+const CACHE = "calc-v6";
 const FILES = [
   "./",
   "./index.html",
@@ -12,7 +13,7 @@ const FILES = [
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {

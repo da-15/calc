@@ -32,4 +32,4 @@
 | `docs/sw.js` | オフライン用のキャッシュ |
 | `docs/icons/` | ホーム画面用アイコン |
 
-`docs/` のファイルを更新したときは、`docs/sw.js` の `CACHE` の番号（`calc-v1` など）を上げてください。次に起動したときに新しい版に入れ替わります。
+`docs/` のファイルを更新したときは、`docs/sw.js` の `CACHE` の番号（`calc-v6` など）を上げてください。次に起動したときに新しい版に入れ替わります。アイコンを差し替えたときは、`docs/index.html` と `docs/manifest.webmanifest` にあるアイコンのURLの `?v=` の番号も上げてください。

@@ -15,59 +15,50 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=6">
 <title>式が見える電卓</title>
 <style>
-/* ページの土台：画面の上下の安全領域（ノッチやホームバー）を避け、ページ全体はスクロールさせない */
-:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-*,*::before,*::after{box-sizing:inherit}
-html,body{overflow:hidden;overscroll-behavior:none}
-/* 画面の上下の余白（ステータスバーとホームバーの部分）：上は表示部分の色、下はテンキーの帯の色 */
-html{background:linear-gradient(to bottom,var(--panel) 50%,var(--bg) 50%)}
-body{margin:0;font:14px/1.5 system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%}
-img{max-width:100%}
-</style>
-</head>
-<body>
-<style>
-/* Layout: one-screen app. History tape fills the top, the expression line sits under it, 4x5 keypad pinned to the bottom. */
+/* 画面構成：上に履歴、その下に入力中の式、いちばん下に5×5のテンキー */
 :root{
   --bg:#eef0f2; --panel:#ffffff; --key:#ffffff; --key-op:#e3e9ee; --fg:#1d2730; --muted:#6c7a86;
   --accent:#0f6e74; --accent-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,"Noto Sans JP",sans-serif;
+  color-scheme:light;
+  /* 画面の上下の安全領域（ノッチやホームバー）を避ける */
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+@media (prefers-color-scheme: dark){:root{
   --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
   --accent:#2fa7ac; --accent-fg:#06191a; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
-  --accent:#2fa7ac; --accent-fg:#06191a; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{height:100%}
-body{background:var(--panel);color:var(--fg);font-family:var(--sans);
+/* ページ全体はスクロールさせない。上下の余白は、上を表示部分、下をテンキーの帯の色で塗る */
+html{height:100%;overflow:hidden;overscroll-behavior:none;background:linear-gradient(to bottom,var(--panel) 50%,var(--bg) 50%)}
+body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--panel);color:var(--fg);
+  font:14px/1.5 var(--sans);-webkit-text-size-adjust:100%;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-.app{height:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:4px;padding-block:12px 16px;box-sizing:border-box}
-.screen{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;
-  padding:8px 0}
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.app{height:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:4px;padding-block:12px 16px}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:8px 0}
+
+/* 履歴 */
 .history{flex:1 1 0;min-height:0;overflow-y:auto;margin-inline:-4px;display:flex;flex-direction:column;gap:6px;
   font-family:var(--mono);font-size:20px;color:var(--muted);text-align:right}
-.history .row{overflow-wrap:anywhere}
 .history>.row:first-child{margin-top:auto}
-.history .ex{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;text-align:right;
-  cursor:pointer;border-radius:6px;overflow-wrap:anywhere}
-.history .ex:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .history .row{border-radius:8px;padding:2px 4px;cursor:pointer}
 .history .row.editing{background:var(--ref-bg);color:var(--fg)}
+.history .ex{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;text-align:right;cursor:pointer;overflow-wrap:anywhere}
 .history .tail{display:inline-block;white-space:nowrap;max-width:100%}
 .history .ans{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);font:400 20px var(--mono);
-  display:inline-block;line-height:1.3;vertical-align:baseline;border-radius:7px;padding:0 6px;cursor:pointer}
+  display:inline-block;line-height:1.3;border-radius:7px;padding:0 6px;cursor:pointer}
 .history .ans:active{filter:brightness(.92)}
-.history .ans:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .history .ans.off{opacity:.45;cursor:default}
 .history .ans.bad{color:var(--err);font-family:var(--sans);font-size:15px;cursor:default}
 .history .row.changed .ans{animation:flash 1.4s ease-out}
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
-.ref{display:inline-block;line-height:1.3;vertical-align:baseline;background:var(--ref-bg);color:var(--accent);
-  border:1px solid transparent;border-radius:7px;padding:0 6px;font-weight:400}
+.ref{display:inline-block;line-height:1.3;background:var(--ref-bg);color:var(--accent);
+  border:1px solid transparent;border-radius:7px;padding:0 6px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 式のラベルと編集中のボタン */
 .label{font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;height:30px}
 .label.editing #exprLabel{color:var(--accent);font-weight:700}
 .lab-right{display:flex;align-items:center;gap:8px}
@@ -75,90 +66,87 @@ body{background:var(--panel);color:var(--fg);font-family:var(--sans);
 .editbar{display:flex;align-items:center;gap:6px}
 .editbar button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;
   height:28px;padding:0 12px;line-height:1;font:700 13px var(--sans);cursor:pointer}
-.editbar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .editbar .del{background:var(--err);border-color:var(--err);color:var(--panel)}
-.expr{flex:0 0 auto;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
+
+/* 入力中の式 */
+.expr{flex:none;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
   font-family:var(--mono);font-size:20px;line-height:1.5;text-align:right;overflow-wrap:anywhere;
   border-top:1px solid var(--line);padding-top:8px}
-.expr>.line{display:block}
+.expr .line{display:block}
 .expr .ghost{color:var(--ghost)}
-.expr .tok{cursor:text;border-radius:4px}
+.expr .tok{border-radius:4px}
 .expr .tok.sel{background:var(--ref-bg);outline:2px solid var(--accent);outline-offset:0}
 .expr .tok.sel .ref{background:none}
 .expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
-@media (prefers-reduced-motion:reduce){.expr .cur,.history .row.changed .ans{animation:none}}
-.result{display:inline;font-family:var(--mono);font-weight:500;font-size:20px;
-  font-variant-numeric:tabular-nums;color:var(--muted);transition:color .15s}
-.result.final{color:var(--fg)}
-.result.err{color:var(--err);font-family:var(--sans);font-size:15px;font-weight:500;margin-left:8px}
-/* テンキーの段だけグレーの帯にして、画面の左右と下の端まで広げる */
+.result{font-weight:500;color:var(--muted)}
+.result.err{color:var(--err);font-family:var(--sans);font-size:15px;margin-left:8px}
+
+/* テンキー：グレーの帯にして、画面の左右と下の端まで広げる */
 .keyarea{display:flex;flex-direction:column;touch-action:none;flex:none;padding-top:2px;
   background:var(--bg);box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax -100vmax -100vmax)}
-.grip{flex:none;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.grip{height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .grip::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--ghost)}
-.grip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:6px}
 .keys-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .28s ease,opacity .2s ease}
 .keys-wrap.hidden{grid-template-rows:0fr;opacity:0}
 .keys-wrap.hidden>.keys{padding-block:0}
-@media (prefers-reduced-motion:reduce){.keys-wrap{transition:none}}
 body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .keys{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;min-height:0;overflow:hidden;padding:2px}
 .keys button{appearance:none;border:1px solid var(--line);background:var(--key);color:var(--fg);border-radius:16px;
   height:clamp(42px,6.8vh,54px);font-family:var(--mono);font-size:21px;cursor:pointer;touch-action:manipulation;transition:transform .06s,filter .06s}
 .keys button:active{transform:scale(.95);filter:brightness(.92)}
-.keys button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .keys .op{background:var(--key-op);font-size:23px}
 .keys .zeros{font-size:18px}
-#k-pct,#k-neg{font-size:19px}
-.keys .bs-icon{width:26px;height:26px;display:block;margin:auto}
-.keys .blank{display:block}
+.keys .small{font-size:19px}
 .keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
 .keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}
-.scrim{position:fixed;inset:0;z-index:20;background:rgba(10,16,20,.45);display:flex;align-items:center;justify-content:center;
-  padding:24px max(24px,env(safe-area-inset-right,0px)) 24px max(24px,env(safe-area-inset-left,0px))}
+.keys svg{width:26px;height:26px;display:block;margin:auto}
+@media (prefers-reduced-motion:reduce){.expr .cur,.history .row.changed .ans{animation:none}.keys-wrap{transition:none}}
+
+/* 履歴をすべて消す確認 */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(10,16,20,.45);display:flex;align-items:center;justify-content:center;padding:24px}
 .dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:18px;padding:20px;width:100%;max-width:320px;
   display:flex;flex-direction:column;gap:8px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
 .m-title{margin:0;font-size:17px;font-weight:700}
-.m-body{margin:0;font-size:14px;color:var(--muted);line-height:1.6}
+.m-body{margin:0;color:var(--muted);line-height:1.6}
 .m-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .m-actions button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:12px;height:44px;
   font:700 15px var(--sans);cursor:pointer}
-.m-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .m-actions .danger{background:var(--err);border-color:var(--err);color:var(--panel)}
 </style>
-
+</head>
+<body>
 <div class="app">
-  <section class="screen" aria-live="polite">
+  <section class="screen">
     <div class="history" id="history"></div>
     <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="editbar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
-    <div class="expr" id="expr"><span class="line"><span id="exprText"></span><span class="result" id="result"></span></span></div>
+    <div class="expr" id="expr" aria-live="polite"><span class="line"><span id="exprText"></span><span class="result" id="result"></span></span></div>
   </section>
   <div class="keyarea" id="keyarea">
-  <div class="grip" id="grip" role="button" tabindex="0" aria-label="テンキーを隠す"></div>
-  <div class="keys-wrap" id="keysWrap">
-  <div class="keys" id="keys">
-    <button class="fn" data-k="C" id="k-c">AC</button>
-    <button class="fn" data-k="⌫" id="k-bs" aria-label="1文字消す"><svg class="bs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6.5-7z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg></button>
-    <button class="op" data-k="(" id="k-lp">(</button>
-    <button class="op" data-k=")" id="k-rp">)</button>
-    <button class="op" data-k="÷" id="k-div">÷</button>
-    <button class="op" data-k="%" id="k-pct">%</button>
-    <button data-k="7" id="k7">7</button><button data-k="8" id="k8">8</button><button data-k="9" id="k9">9</button>
-    <button class="op" data-k="×" id="k-mul">×</button>
-    <button class="op" data-k="±" id="k-neg" aria-label="符号を切り替える">±</button>
-    <button data-k="4" id="k4">4</button><button data-k="5" id="k5">5</button><button data-k="6" id="k6">6</button>
-    <button class="op" data-k="−" id="k-sub">−</button>
-    <span class="blank" aria-hidden="true"></span>
-    <button data-k="1" id="k1">1</button><button data-k="2" id="k2">2</button><button data-k="3" id="k3">3</button>
-    <button class="op" data-k="+" id="k-add">+</button>
-    <button class="zeros" data-k="000" id="k000">000</button>
-    <button class="zeros" data-k="00" id="k00">00</button>
-    <button data-k="0" id="k0">0</button>
-    <button data-k="." id="k-dot">.</button>
-    <button class="eq" data-k="=" id="k-eq">=</button>
-  </div>
-  </div>
+    <div class="grip" id="grip" role="button" tabindex="0" aria-label="テンキーを隠す"></div>
+    <div class="keys-wrap" id="keysWrap">
+      <div class="keys" id="keys">
+        <button class="fn" data-k="C">AC</button>
+        <button class="fn" data-k="⌫" aria-label="1文字消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6.5-7z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg></button>
+        <button class="op" data-k="(">(</button>
+        <button class="op" data-k=")">)</button>
+        <button class="op" data-k="÷">÷</button>
+        <button class="op small" data-k="%">%</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button class="op" data-k="×">×</button>
+        <button class="op small" data-k="±" aria-label="符号を切り替える">±</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button class="op" data-k="−">−</button>
+        <span aria-hidden="true"></span>
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button class="op" data-k="+">+</button>
+        <button class="zeros" data-k="000">000</button>
+        <button class="zeros" data-k="00">00</button>
+        <button data-k="0">0</button>
+        <button data-k=".">.</button>
+        <button class="eq" data-k="=">=</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -178,46 +166,41 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
    行を編集すると、その答えを参照している行を上から順に計算し直す。 */
 const OPS = ["+","−","×","÷"];
 const LIMIT = 200;
-let expr = "";        // 入力中の式
-let done = false;     // = を押した直後か
-let history = [];     // {id, e:式, v:答え}
+const STORE = "calc-history-v2";
+let expr = "";          // 入力中の式
+let pos = 0;            // カーソル位置
+let sel = null;         // 選択中の数字 {a,b}
+let done = false;       // ＝を押した直後か
+let lastId = null;      // 直前に確定した行
+let history = [];       // {id, e:式, v:答え}
 let nextId = 1;
-let editing = null;   // 編集中の行のID
-let lastKey = null;
-let lastId = null;    // 直前に確定した行
-let pos = 0;          // カーソル位置
-let sel = null;       // 選択中の数字 {a,b}
-const flash = new Set();
-let scrollToEnd = true;  // 新しい行が増えたときだけ、履歴をいちばん下まで送る
+let editing = null;     // 編集中の行のID
+let historyDirty = true;   // 履歴の表示を描き直す必要があるか
+let scrollToEnd = true;    // 新しい行が増えたときだけ、履歴をいちばん下まで送る
+const flash = new Set();   // 再計算で答えが変わった行
 
 const $ = id => document.getElementById(id);
-const last = () => expr.slice(-1);
-const isDigit = c => /[0-9]/.test(c);
+const el = { history:$("history"), expr:$("expr"), exprText:$("exprText"), result:$("result"), label:$("exprLabel"),
+  parenInfo:$("parenInfo"), editBar:$("editBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
+const isDigit = c => c>="0" && c<="9";
 const endsOperand = c => isDigit(c) || c===")" || c==="]" || c==="." || c==="%";
-const opens = s => [...s].reduce((n,c)=> c==="(" ? n+1 : c===")" ? n-1 : n, 0);
+const opens = s => { let n=0; for(const c of s){ if(c==="(") n++; else if(c===")") n--; } return n; };
 const byId = id => history.find(h=>h.id===id);
 const idxOf = id => history.findIndex(h=>h.id===id);
 
 /* ---- 保存（この端末のブラウザ内） ---- */
-const STORE="calc-history-v2", OLD="calc-history-v1";
 function save(){ try{ localStorage.setItem(STORE, JSON.stringify({nextId, history})); }catch(e){} }
 function load(){
   try{
-    const raw=localStorage.getItem(STORE);
-    if(raw){
-      const d=JSON.parse(raw);
-      if(d && Array.isArray(d.history)){
-        history=d.history.filter(x=>x&&typeof x.e==="string"&&Number.isInteger(x.id));
-        nextId=Math.max(d.nextId|0, 1, ...history.map(h=>h.id+1));
-      }
-    } else {
-      const a=JSON.parse(localStorage.getItem(OLD)||"[]");
-      if(Array.isArray(a)) history=a.filter(x=>x&&typeof x.e==="string").slice(-LIMIT).map(x=>({id:nextId++, e:x.e, v:x.v}));
+    const d=JSON.parse(localStorage.getItem(STORE)||"null");
+    if(d && Array.isArray(d.history)){
+      history=d.history.filter(x=>x&&typeof x.e==="string"&&Number.isInteger(x.id));
+      nextId=Math.max(d.nextId|0, 1, ...history.map(h=>h.id+1));
     }
   }catch(e){}
   recalc(false);
   // 上限を超えていたら古い行から消す（参照している式は数字に置き換える）
-  if(history.length>LIMIT){ while(history.length>LIMIT) removeRow(history[0].id); recalc(false); save(); }
+  if(history.length>LIMIT){ while(history.length>LIMIT) removeRow(history[0].id); save(); }
 }
 
 /* ---- 計算（evalは使わず、自前で式を解析） ---- */
@@ -243,6 +226,7 @@ function evaluate(s){
       const d = r.pct ? v*r.v : r.v;
       v = addRound(v, o==="+" ? d : -d); }
     return v; }
+  // 10%×2 のように%が1つだけの項は「20%」として扱う
   function term(){ const f=factor(); let v=f.v, pcts=f.pct?1:0;
     while(true){
       let o=t[p];
@@ -253,8 +237,7 @@ function evaluate(s){
       if(o==="÷"&&r.v===0) throw "0では割れません";
       v = o==="×" ? v*r.v : v/r.v;
     }
-    return {v, pct:pcts===1}; }   // 10%×2 のように%が1つだけの項は「20%」として扱う
-  // 10% は単独なら 0.1、掛け算・割り算では 10/100 として使う
+    return {v, pct:pcts===1}; }
   function factor(){ const v=unary(); if(t[p]==="%"){ p++; return {v:v/100, pct:true}; } return {v, pct:false}; }
   function unary(){ expect(); if(t[p]==="−"){ p++; return -unary(); } return atom(); }
   function atom(){ expect(); const x=t[p++];
@@ -269,10 +252,9 @@ function addRound(a,b){
   const v=a+b, m=Math.max(Math.abs(a),Math.abs(b));
   if(!isFinite(v)||m===0) return v;
   const d=14-Math.floor(Math.log10(m));
-  if(d<0||d>100) return v;
-  return Number(v.toFixed(d));
+  return d<0||d>100 ? v : Number(v.toFixed(d));
 }
-function clean(v){ return parseFloat(v.toPrecision(15)); }
+const clean = v => parseFloat(v.toPrecision(15));
 function fmt(v){
   if(!isFinite(v)) return "エラー";
   const c=clean(v), sign = c<0 ? "−" : "", a=Math.abs(c);
@@ -284,43 +266,48 @@ function numLit(v){
   const s=Math.abs(clean(v)).toLocaleString("en-US",{useGrouping:false,maximumSignificantDigits:15});
   return v<0 ? "(−"+s+")" : s;
 }
+// 途中の式から、計算できる形を作る：末尾の演算子などを外し、閉じ括弧を補う
+function complete(s){
+  while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
+  return s ? s+")".repeat(Math.max(0,opens(s))) : "";
+}
 
 /* ---- 履歴の再計算・追加・削除 ---- */
 function recalc(mark){
   for(const h of history){
     const old=h.v; let v;
     try{ v=evaluate(h.e); }catch(e){ v=NaN; }
-    if(!isFinite(v)) v=NaN;
-    h.v=v;
-    if(mark && !Object.is(old,v)) flash.add(h.id);
+    h.v = isFinite(v) ? v : NaN;
+    if(mark && !Object.is(old,h.v)) flash.add(h.id);
   }
+  historyDirty=true;
 }
 // 消える行を参照している式は、その時点の数字に置き換える
 function freeze(id){
   const h=byId(id); if(!h||!isFinite(h.v)) return;
   const lit=numLit(h.v), tag="["+id+"]";
   for(const x of history) if(x.id!==id) x.e=x.e.split(tag).join(lit);
-  setExpr(expr.split(tag).join(lit));
+  if(expr.includes(tag)) setExpr(expr.split(tag).join(lit));
 }
-function removeRow(id){ freeze(id); const i=idxOf(id); if(i>=0) history.splice(i,1); }
+function removeRow(id){ freeze(id); const i=idxOf(id); if(i>=0) history.splice(i,1); historyDirty=true; }
 function pushRow(e,v){
   const id=nextId++;
   history.push({id,e,v});
   while(history.length>LIMIT) removeRow(history[0].id);
+  historyDirty=true; scrollToEnd=true;
   return id;
 }
 
 /* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
 function press(k){
-  if(!$("modal").hidden) return;
-  const prevKey=lastKey; lastKey=k;
+  if(!el.modal.hidden) return;
   // 入力欄が空のときのACは、履歴をすべて消す確認を出す（行の編集中は除く）
   if(k==="C" && expr==="" && editing===null && history.length){ openModal(); return; }
-  if(k==="="){ sel=null; return equals(); }
+  if(k==="=") return equals();
   if(k==="C"){ setExpr(""); done=false; return render(); }
   if(done){
-    // ＝の直後に演算子を押すと、直前の答えを参照して続ける
+    // ＝の直後に演算子・%・±を押すと、直前の答えを参照して続ける
     if((OPS.includes(k)||k==="%"||k==="±") && expr==="" && byId(lastId)) setExpr("["+lastId+"]");
     done=false;
   }
@@ -328,22 +315,65 @@ function press(k){
   let b, a;
   if(sel){
     // 選択中の数字は、数字を打つと置き換わり、⌫で丸ごと消える
-    if(isDigit(k)||k==="."||k==="⌫"){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); }
-    else { b=expr.slice(0,sel.b); a=expr.slice(sel.b); }
-    sel=null;
+    const replace = isDigit(k)||k==="."||k==="⌫";
+    b=expr.slice(0, replace ? sel.a : sel.b); a=expr.slice(sel.b); sel=null;
     if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
   } else { b=expr.slice(0,pos); a=expr.slice(pos); }
   // 00・000 は 0 を続けて打ったのと同じ
-  const nb = (k==="00"||k==="000") ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
+  const nb = k==="00"||k==="000" ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
   if(nb!==null){ expr=nb+(k==="⌫"?"":joinRight(nb,a))+a; pos=nb.length; }
   render();
+}
+// カーソルより前の部分 b に、キー k を打ったときの新しい b を返す（何もしないなら null）
+function applyKey(b,a,k){
+  const L=b.slice(-1);
+  const curNum=()=>b.match(/[0-9.]*$/)[0];
+  if(isDigit(k)||k==="."){
+    if(L===")"||L==="]"||L==="%") b+="×";
+    if(k==="."){
+      if((curNum()+a.match(/^[0-9.]*/)[0]).includes(".")) return null;
+      return b+(curNum()===""?"0.":".");
+    }
+    if(curNum()==="0") b=b.slice(0,-1);   // 先頭の0を置き換え
+    return b+k;
+  }
+  if(OPS.includes(k)){
+    if(b===""||L==="(") return k==="−" ? b+"−" : null;  // 先頭・括弧の直後はマイナスだけ
+    if(L===".") b=b.slice(0,-1);
+    if(OPS.includes(b.slice(-1))){
+      if(b.length===1||b.slice(-2,-1)==="(") return null;   // 「(−」の−は置き換えない
+      b=b.slice(0,-1);
+    }
+    return b+k;
+  }
+  if(k==="%"){
+    if(b===""||L==="("||L==="%"||OPS.includes(L)) return null;
+    return (L==="." ? b.slice(0,-1) : b)+"%";
+  }
+  if(k==="("){
+    if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"×";
+    return b+"(";
+  }
+  if(k===")"){
+    if(opens(b)<=0||L==="("||OPS.includes(L)) return null;
+    return (L==="." ? b.slice(0,-1) : b)+")";
+  }
+  if(k==="⌫") return L==="]" ? b.replace(/\[\d+\]$/,"") : b.slice(0,-1);
+  return null;
+}
+// カーソルの右側との間に、必要なら×を補う
+function joinRight(b,a){
+  const L=b.slice(-1), R=a.charAt(0);
+  if((L===")"||L==="]"||L==="%") && (isDigit(R)||R==="."||R==="("||R==="[")) return "×";
+  if((isDigit(L)||L===".") && (R==="("||R==="[")) return "×";
+  return "";
 }
 // ± ：カーソルのある数字（または選択中の数字）の符号を切り替える
 function toggleSign(){
   let q=pos;
-  if(!sel && expr[q-1]===")" && /\(−[0-9.]+%?\)$|\(−\[\d+\]%?\)$/.test(expr.slice(0,q))) q--;   // (−5) の直後
+  if(!sel && expr[q-1]===")" && /\(−([0-9.]+|\[\d+\])%?\)$/.test(expr.slice(0,q))) q--;   // (−5) の直後
   if(!sel && expr[q-1]==="%") q--;
-  const tk = sel ? {a:sel.a,b:sel.b} : exprTokens(expr).find(t=>(t.k==="num"||t.k==="ref") && t.a<q && q<=t.b);
+  const tk = sel || exprTokens(expr).find(t=>(t.k==="num"||t.k==="ref") && t.a<q && q<=t.b);
   if(!tk){
     // 数字を打つ前なら、マイナスの数を打ち始める
     const b=expr.slice(0,pos), a=expr.slice(pos), L=b.slice(-1);
@@ -361,59 +391,10 @@ function toggleSign(){
   if(sel){ sel={a:na,b:end}; pos=end; }
   else pos = end + (wrapped?1:0) + (expr[end+(wrapped?1:0)]==="%" && q<pos ? 1 : 0);
 }
-function joinRight(b,a){
-  const L=b.slice(-1), R=a.charAt(0);
-  if((L===")"||L==="]"||L==="%") && (isDigit(R)||R==="."||R==="("||R==="[")) return "×";
-  if((isDigit(L)||L===".") && (R==="("||R==="[")) return "×";
-  return "";
-}
-// カーソルより前の部分 b に、キー k を打ったときの新しい b を返す（何もしないなら null）
-function applyKey(b,a,k){
-  const L=b.slice(-1);
-  const curNum=()=>b.match(/[0-9.]*$/)[0];
-  if(isDigit(k)){
-    if(L===")"||L==="]"||L==="%") b+="×";
-    if(curNum()==="0") b=b.slice(0,-1);   // 先頭の0を置き換え
-    return b+k;
-  }
-  if(k==="."){
-    if(L===")"||L==="]"||L==="%") b+="×";
-    if((curNum()+a.match(/^[0-9.]*/)[0]).includes(".")) return null;
-    return b+(curNum()===""?"0.":".");
-  }
-  if(OPS.includes(k)){
-    if(b===""||L==="(") return k==="−" ? b+"−" : null;  // 先頭・括弧の直後はマイナスだけ
-    if(L===".") b=b.slice(0,-1);
-    if(OPS.includes(b.slice(-1))){
-      const prev=b.slice(-2,-1);
-      if(prev==="("||b.length===1) return null;   // 「(−」の−は置き換えない
-      b=b.slice(0,-1);
-    }
-    return b+k;
-  }
-  if(k==="%"){
-    if(b===""||L==="("||L==="%"||OPS.includes(L)) return null;
-    if(L===".") b=b.slice(0,-1);
-    return b+"%";
-  }
-  if(k==="("){
-    if(endsOperand(L)){ if(L===".") b=b.slice(0,-1); b+="×"; }
-    return b+"(";
-  }
-  if(k===")"){
-    if(opens(b)<=0||L==="("||OPS.includes(L)) return null;
-    if(L===".") b=b.slice(0,-1);
-    return b+")";
-  }
-  if(k==="⌫") return L==="]" ? b.replace(/\[\d+\]$/,"") : b.slice(0,-1);
-  return null;
-}
 function equals(){
-  if(!expr) return;
-  let s=expr;
-  while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
+  sel=null;
+  const s=complete(expr);
   if(!s) return;
-  s+=")".repeat(Math.max(0,opens(s)));
   let v; try{ v=evaluate(s); }catch(e){ showError(e); return; }
   if(!isFinite(v)){ showError("桁が大きすぎます"); return; }
   let id;
@@ -421,40 +402,35 @@ function equals(){
     const h=byId(editing); h.e=s; id=h.id; editing=null;
     recalc(true); flash.add(id);
   } else {
-    id=pushRow(s,v); scrollToEnd=true;
+    id=pushRow(s,v);
   }
   save();
-  setExpr(""); lastId=id;
-  done=true;
+  setExpr(""); lastId=id; done=true;
   render();
 }
-function showError(msg){ const r=$("result"); r.className="result err"; r.textContent=msg; }
+function showError(msg){ el.result.className="result err"; el.result.textContent=msg; }
 
 /* ---- 行の編集 ---- */
-function startEdit(id){
-  editing=id; setExpr(byId(id).e); done=false; lastKey=null; render();
-}
-function cancelEdit(){ editing=null; setExpr(""); done=false; lastKey=null; render(); }
+function startEdit(id){ editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
+function cancelEdit(){ editing=null; setExpr(""); done=false; historyDirty=true; render(); }
 function deleteEditing(){
   const id=editing; editing=null; removeRow(id); recalc(true); save();
-  setExpr(""); done=false; lastKey=null; render();
+  setExpr(""); done=false; render();
 }
 // 過去の答えを参照として式に入れる（編集中は、その行より上の答えだけ）
 function insertRef(id){
-  lastKey=null;
   done=false;
   let b,a;
   if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
   const L=b.slice(-1);
-  if(endsOperand(L)){ if(L===".") b=b.slice(0,-1); b+="×"; }
+  if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"×";
   b+="["+id+"]"; expr=b+joinRight(b,a)+a; pos=b.length; render();
 }
 
 /* ---- 表示 ---- */
-function esc(s){ return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
-function pretty(s){
-  return esc(s).replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return `<span class="ref">${h&&isFinite(h.v)?fmt(h.v):"?"}</span>`; });
-}
+const esc = s => s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function refHtml(id){ const h=byId(id); return `<span class="ref">${h&&isFinite(h.v)?fmt(h.v):"?"}</span>`; }
+const pretty = s => esc(s).replace(/\[(\d+)\]/g,(m,id)=>refHtml(+id));
 function exprTokens(s){
   const t=[]; let i=0;
   while(i<s.length){ const c=s[i];
@@ -469,82 +445,69 @@ function liveExprHtml(){
   let html = (!sel && pos===0) ? cur : "";
   for(const tk of exprTokens(expr)){
     const txt=expr.slice(tk.a,tk.b);
-    let inner;
-    if(tk.k==="ref"){ const h=byId(+txt.slice(1,-1)); inner=`<span class="ref">${h&&isFinite(h.v)?fmt(h.v):"?"}</span>`; }
-    else if(!sel && pos>tk.a && pos<tk.b){ inner=esc(txt.slice(0,pos-tk.a))+cur+esc(txt.slice(pos-tk.a)); }
-    else inner=esc(txt);
+    const inner = tk.k==="ref" ? refHtml(+txt.slice(1,-1))
+      : (!sel && pos>tk.a && pos<tk.b) ? esc(txt.slice(0,pos-tk.a))+cur+esc(txt.slice(pos-tk.a))
+      : esc(txt);
     const on = sel && sel.a===tk.a && sel.b===tk.b;
     html+=`<span class="tok k-${tk.k}${on?" sel":""}" data-a="${tk.a}" data-b="${tk.b}">${inner}</span>`;
     if(!sel && pos===tk.b && pos>0) html+=cur;
   }
   return html;
 }
-function render(finishedExpr, finishedVal){
-  if(pos>expr.length||pos<0) pos=expr.length;
-  const h=$("history");
+// 履歴は、内容や編集状態が変わったときだけ描き直す
+function renderHistory(){
   const editIdx = editing===null ? history.length : idxOf(editing);
-  h.innerHTML=history.map((x,i)=>{
+  el.history.innerHTML=history.map((x,i)=>{
     const ans = !isFinite(x.v) ? `<span class="ans bad">エラー</span>`
-      : i<editIdx ? `<button class="ans" data-id="${x.id}" id="ans-${x.id}" aria-label="${fmt(x.v)} を式に入れる">${fmt(x.v)}</button>`
+      : i<editIdx ? `<button class="ans" data-id="${x.id}" aria-label="${fmt(x.v)} を式に入れる">${fmt(x.v)}</button>`
       : `<span class="ans off">${fmt(x.v)}</span>`;
     const cls = "row"+(x.id===editing?" editing":"")+(flash.has(x.id)?" changed":"");
-    return `<div class="${cls}" data-id="${x.id}"><button class="ex" data-id="${x.id}" id="ex-${x.id}" aria-label="この行を編集">${pretty(x.e)}</button><span class="tail">=${ans}</span></div>`;
+    return `<div class="${cls}" data-id="${x.id}"><button class="ex" aria-label="この行を編集">${pretty(x.e)}</button><span class="tail">=${ans}</span></div>`;
   }).join("");
   flash.clear();
-  if(scrollToEnd){ h.scrollTop=h.scrollHeight; scrollToEnd=false; }
-  $("editBar").hidden = editing===null;
-  $("exprLabel").textContent = editing===null ? "式" : "行を編集";
-  $("exprLabel").parentNode.classList.toggle("editing", editing!==null);
-
-  const r=$("result");
-  if(finishedExpr!==undefined){
-    $("exprText").innerHTML = pretty(finishedExpr)+"=";
-    r.className="result final"; r.textContent=fmt(finishedVal);
-    $("parenInfo").textContent="";
-    return;
-  }
-  const open=opens(expr);
-  $("exprText").innerHTML = liveExprHtml() + `<span class="ghost">${")".repeat(Math.max(0,open))}</span>`;
-  if(pos===expr.length) $("expr").scrollTop = $("expr").scrollHeight;
-  const full = editing===null && expr!=="" && history.length>=LIMIT;
-  $("parenInfo").textContent = full ? `上限${LIMIT}件です。確定すると最古の行が消えます。`
-    : open>0 ? `閉じていない括弧 ${open}` : "";
-  $("parenInfo").classList.toggle("warn", full);
-  const v=preview();
-  if(v===null){ r.className="result"; r.textContent=""; }
-  else if(typeof v==="string"){ if(v==="0では割れません"){ r.className="result err"; r.textContent=v; } else { r.className="result"; r.textContent=""; } }
-  else { r.className="result"; r.textContent="="+fmt(v); }
+  if(scrollToEnd){ el.history.scrollTop=el.history.scrollHeight; scrollToEnd=false; }
+  el.editBar.hidden = editing===null;
+  el.label.textContent = editing===null ? "式" : "行を編集";
+  el.label.parentNode.classList.toggle("editing", editing!==null);
+  historyDirty=false;
 }
-// 途中の式でも答えを先に見せる：末尾の演算子を外し、閉じ括弧を補う
-function preview(){
-  let s=expr;
-  while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
-  if(!s) return null;
-  s+=")".repeat(Math.max(0,opens(s)));
-  try{ return evaluate(s); }catch(e){ return e; }
+function render(){
+  if(historyDirty) renderHistory();
+  if(pos>expr.length||pos<0) pos=expr.length;
+  const open=opens(expr);
+  el.exprText.innerHTML = liveExprHtml() + `<span class="ghost">${")".repeat(Math.max(0,open))}</span>`;
+  if(pos===expr.length) el.expr.scrollTop = el.expr.scrollHeight;
+  const full = editing===null && expr!=="" && history.length>=LIMIT;
+  el.parenInfo.textContent = full ? `上限${LIMIT}件です。確定すると最古の行が消えます。`
+    : open>0 ? `閉じていない括弧 ${open}` : "";
+  el.parenInfo.classList.toggle("warn", full);
+  // 途中の式でも答えを先に見せる
+  const s=complete(expr);
+  let v=null; if(s){ try{ v=evaluate(s); }catch(e){ v=e; } }
+  if(v==="0では割れません") showError(v);
+  else { el.result.className="result"; el.result.textContent = typeof v==="number" ? "="+fmt(v) : ""; }
 }
 
 /* ---- 全消去の確認 ---- */
 function openModal(){
   $("m-body").textContent=`${history.length}件の計算履歴が消えます。元には戻せません。`;
-  $("modal").hidden=false; $("m-cancel").focus();
+  el.modal.hidden=false; $("m-cancel").focus();
 }
-function closeModal(){ $("modal").hidden=true; lastKey=null; }
+const closeModal = () => { el.modal.hidden=true; };
 $("m-cancel").addEventListener("click",closeModal);
-$("m-ok").addEventListener("click",()=>{ history=[]; editing=null; save(); setExpr(""); done=false; closeModal(); render(); });
-$("modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
+$("m-ok").addEventListener("click",()=>{ history=[]; editing=null; historyDirty=true; save(); setExpr(""); done=false; closeModal(); render(); });
+el.modal.addEventListener("click",e=>{ if(e.target===el.modal) closeModal(); });
 
 /* ---- 操作 ---- */
-$("history").addEventListener("click",e=>{
+el.history.addEventListener("click",e=>{
   const a=e.target.closest("button.ans"); if(a){ insertRef(+a.dataset.id); return; }
-  const x=e.target.closest(".row"); if(x){ startEdit(+x.dataset.id); }
+  const x=e.target.closest(".row"); if(x) startEdit(+x.dataset.id);
 });
 // 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
-$("expr").addEventListener("click",e=>{
-  if(!$("modal").hidden||suppressClick) return;
+el.expr.addEventListener("click",e=>{
+  if(!el.modal.hidden||suppressClick) return;
   if(keysHidden) setKeys(false);    // 隠れているときに式をタップしたらテンキーを戻す
   done=false;
-  lastKey=null;
   const t=e.target.closest(".tok");
   if(t){
     const a=+t.dataset.a, b=+t.dataset.b;
@@ -553,63 +516,58 @@ $("expr").addEventListener("click",e=>{
     } else if(sel && sel.a===a && sel.b===b){ sel=null; pos=b; }
     else { sel={a,b}; pos=b; }
   } else {
-    const first=$("exprText").querySelector(".tok");
-    const r=first && first.getBoundingClientRect();
+    const r=el.exprText.querySelector(".tok")?.getBoundingClientRect();
     pos = (r && e.clientX<r.left && e.clientY<r.bottom) ? 0 : expr.length;
     sel=null;
   }
   render();
 });
+$("e-cancel").addEventListener("click",cancelEdit);
+$("e-del").addEventListener("click",deleteEditing);
+$("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });
+document.addEventListener("keydown",e=>{
+  if(!el.modal.hidden){ if(e.key==="Escape") closeModal(); return; }
+  const map={"+":"+","-":"−","*":"×","/":"÷","%":"%","Enter":"=","=":"=","Backspace":"⌫","Escape":"C","(":"(",")":")",".":"."};
+  const k = e.key.length===1&&isDigit(e.key) ? e.key : map[e.key];
+  if(k){ e.preventDefault(); press(k); }
+});
+
 /* ---- テンキーを隠す・戻す ---- */
-let keysHidden=false, suppressClick=false, swipeStart=null;
+let keysHidden=false, suppressClick=false, swipeStart=null, drag=null;
 function setKeys(hide){
   if(keysHidden===hide) return;
   keysHidden=hide;
-  $("keysWrap").classList.toggle("hidden",hide);
+  el.keysWrap.classList.toggle("hidden",hide);
   document.body.classList.toggle("keys-hidden",hide);
-  $("grip").setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
+  el.grip.setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
 }
-// テンキーの上で下へ、または式の欄で上へ、はっきり動かしたときだけ反応する
-function watchSwipe(el, onSwipe){
-  el.addEventListener("pointerdown",e=>{ swipeStart={x:e.clientX, y:e.clientY, on:onSwipe}; });
+function blockClick(){ suppressClick=true; setTimeout(()=>{ suppressClick=false; },350); }
+// 隠れているときは、テンキーの帯・式の欄・ラベルを上へはっきり動かすと戻す
+for(const target of [el.keyarea, el.expr, document.querySelector(".label")]){
+  target.addEventListener("pointerdown",e=>{ if(keysHidden) swipeStart={x:e.clientX, y:e.clientY}; });
 }
-window.addEventListener("pointerup",e=>{
-  const st=swipeStart; swipeStart=null; if(!st) return;
-  const dy=e.clientY-st.y, dx=e.clientX-st.x;
-  if(Math.abs(dy)>45 && Math.abs(dy)>Math.abs(dx)*1.5 && st.on(dy>0?"down":"up")){
-    suppressClick=true; setTimeout(()=>{ suppressClick=false; },350);
-  }
+// 出ているときは、テンキーを指に合わせて下へ動かす。離した位置と速さで、隠すか戻すかを決める
+el.keyarea.addEventListener("pointerdown",e=>{
+  if(!keysHidden) drag={x:e.clientX, y:e.clientY, py:e.clientY, pt:performance.now(), vy:0, H:el.keysWrap.offsetHeight, active:false};
 });
-window.addEventListener("pointercancel",()=>{ swipeStart=null; });
-watchSwipe($("keyarea"), d=>{
-  if(d==="up"&&keysHidden){ setKeys(false); return true; }
-  return false;
-});
-// 隠すときは指に合わせてテンキーを下へ動かす。離した位置と速さで、隠すか戻すかを決める
-let drag=null;
-$("keyarea").addEventListener("pointerdown",e=>{
-  if(keysHidden) return;
-  drag={x:e.clientX, y:e.clientY, py:e.clientY, pt:performance.now(), vy:0, H:$("keysWrap").offsetHeight, active:false};
-});
-window.addEventListener("pointermove",e=>{
+addEventListener("pointermove",e=>{
   if(!drag) return;
-  const dy=e.clientY-drag.y, dx=e.clientX-drag.x, w=$("keysWrap");
+  const dy=e.clientY-drag.y, dx=e.clientX-drag.x;
   if(!drag.active){
-    if(dy>10 && dy>Math.abs(dx)*1.5){ drag.active=true; w.style.transition="none"; }
-    else if(Math.abs(dx)>14||dy<-14){ drag=null; return; }
-    else return;
+    if(dy>10 && dy>Math.abs(dx)*1.5){ drag.active=true; el.keysWrap.style.transition="none"; }
+    else if(Math.abs(dx)>14||dy<-14) drag=null;
+    if(!drag||!drag.active) return;
   }
   const now=performance.now();
   drag.vy=(e.clientY-drag.py)/Math.max(1,now-drag.pt); drag.py=e.clientY; drag.pt=now;
-  w.style.height=Math.max(0, drag.H-Math.max(0,dy))+"px";
+  el.keysWrap.style.height=Math.max(0, drag.H-Math.max(0,dy))+"px";
 });
 function endDrag(e, cancel){
   const d=drag; drag=null;
   if(!d||!d.active) return;
-  suppressClick=true; setTimeout(()=>{ suppressClick=false; },350);
-  const dy=e.clientY-d.y;
-  const hide=!cancel && (dy>d.H*0.35 || d.vy>0.5);
-  const w=$("keysWrap");
+  blockClick();
+  const hide=!cancel && (e.clientY-d.y>d.H*0.35 || d.vy>0.5);
+  const w=el.keysWrap;
   w.style.transition="height .2s ease-out";
   void w.offsetHeight;
   w.style.height = hide ? "0px" : d.H+"px";
@@ -625,32 +583,23 @@ function endDrag(e, cancel){
   w.addEventListener("transitionend",finish,{once:true});
   setTimeout(finish,260);
 }
-window.addEventListener("pointerup",e=>endDrag(e,false));
-window.addEventListener("pointercancel",e=>endDrag(e,true));
-const showOnUp = d=>{ if(d==="up"&&keysHidden){ setKeys(false); return true; } return false; };
-watchSwipe($("expr"), showOnUp);
-watchSwipe(document.querySelector(".label"), showOnUp);
-$("grip").addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
-$("grip").addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
-$("e-cancel").addEventListener("click",cancelEdit);
-$("e-del").addEventListener("click",deleteEditing);
-$("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });
-document.addEventListener("keydown",e=>{
-  if(!$("modal").hidden){ if(e.key==="Escape") closeModal(); return; }
-  const map={"+":"+","-":"−","*":"×","/":"÷","%":"%","Enter":"=","=":"=","Backspace":"⌫","Escape":"C","(":"(",")":")",".":"."};
-  const k = /^[0-9]$/.test(e.key) ? e.key : map[e.key];
-  if(k){ e.preventDefault(); press(k); }
+addEventListener("pointerup",e=>{
+  const st=swipeStart; swipeStart=null;
+  if(st){
+    const dy=e.clientY-st.y, dx=e.clientX-st.x;
+    if(dy<-45 && -dy>Math.abs(dx)*1.5){ setKeys(false); blockClick(); }
+  }
+  endDrag(e,false);
 });
+addEventListener("pointercancel",e=>{ swipeStart=null; endDrag(e,true); });
+el.grip.addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
+el.grip.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
 
 load();
 render();
-</script>
 
-<script>
 // オフラインでも起動できるように、ファイルを端末に保存する仕組みを登録する
-if("serviceWorker" in navigator){
-  addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
-}
+if("serviceWorker" in navigator) addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
 </html>

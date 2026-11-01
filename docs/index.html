@@ -109,6 +109,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .keys .op{background:var(--key-op);font-size:23px}
 .keys .zeros{font-size:18px}
 #k-pct,#k-neg{font-size:19px}
+.keys .bs-icon{width:26px;height:26px;display:block;margin:auto}
 .keys .blank{display:block}
 .keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
 .keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}
@@ -136,7 +137,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
   <div class="keys-wrap" id="keysWrap">
   <div class="keys" id="keys">
     <button class="fn" data-k="C" id="k-c">AC</button>
-    <button class="fn" data-k="⌫" id="k-bs" aria-label="1文字消す">⌫</button>
+    <button class="fn" data-k="⌫" id="k-bs" aria-label="1文字消す"><svg class="bs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6.5-7z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></svg></button>
     <button class="op" data-k="(" id="k-lp">(</button>
     <button class="op" data-k=")" id="k-rp">)</button>
     <button class="op" data-k="÷" id="k-div">÷</button>

@@ -533,40 +533,48 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---- テンキーを隠す・戻す ---- */
-let keysHidden=false, suppressClick=false, swipeStart=null, drag=null;
+let keysHidden=false, suppressClick=false, drag=null, keysH=0;
 function setKeys(hide){
-  if(keysHidden===hide) return;
+  if(hide && el.keysWrap.offsetHeight>0) keysH=el.keysWrap.offsetHeight;   // 出すときに使う高さを覚えておく
   keysHidden=hide;
   el.keysWrap.classList.toggle("hidden",hide);
   document.body.classList.toggle("keys-hidden",hide);
   el.grip.setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
 }
 function blockClick(){ suppressClick=true; setTimeout(()=>{ suppressClick=false; },350); }
-// 隠れているときは、テンキーの帯・式の欄・ラベルを上へはっきり動かすと戻す
-for(const target of [el.keyarea, el.expr, document.querySelector(".label")]){
-  target.addEventListener("pointerdown",e=>{ if(keysHidden) swipeStart={x:e.clientX, y:e.clientY}; });
+// テンキーを指に合わせて動かす。出ているときは下へ、隠れているときは上へ。
+// 離した位置と速さで、切り替えるか元に戻すかを決める
+function startDrag(e){
+  const show=keysHidden;
+  drag={x:e.clientX, y:e.clientY, py:e.clientY, pt:performance.now(), vy:0, show, active:false,
+    H: show ? (keysH || $("keys").scrollHeight+4) : el.keysWrap.offsetHeight};
 }
-// 出ているときは、テンキーを指に合わせて下へ動かす。離した位置と速さで、隠すか戻すかを決める
-el.keyarea.addEventListener("pointerdown",e=>{
-  if(!keysHidden) drag={x:e.clientX, y:e.clientY, py:e.clientY, pt:performance.now(), vy:0, H:el.keysWrap.offsetHeight, active:false};
-});
+el.keyarea.addEventListener("pointerdown",startDrag);
+// 隠れているときは、式の欄とラベルからも引き上げられる
+for(const t of [el.expr, document.querySelector(".label")]) t.addEventListener("pointerdown",e=>{ if(keysHidden) startDrag(e); });
 addEventListener("pointermove",e=>{
   if(!drag) return;
-  const dy=e.clientY-drag.y, dx=e.clientX-drag.x;
+  const dir=drag.show?-1:1, along=(e.clientY-drag.y)*dir, dx=e.clientX-drag.x, w=el.keysWrap;
   if(!drag.active){
-    if(dy>10 && dy>Math.abs(dx)*1.5){ drag.active=true; el.keysWrap.style.transition="none"; }
-    else if(Math.abs(dx)>14||dy<-14) drag=null;
+    if(along>10 && along>Math.abs(dx)*1.5){
+      drag.active=true; w.style.transition="none";
+      if(drag.show){ w.style.height="0px"; w.classList.remove("hidden"); }
+    }
+    else if(Math.abs(dx)>14||along<-14) drag=null;
     if(!drag||!drag.active) return;
   }
   const now=performance.now();
-  drag.vy=(e.clientY-drag.py)/Math.max(1,now-drag.pt); drag.py=e.clientY; drag.pt=now;
-  el.keysWrap.style.height=Math.max(0, drag.H-Math.max(0,dy))+"px";
+  drag.vy=(e.clientY-drag.py)*dir/Math.max(1,now-drag.pt); drag.py=e.clientY; drag.pt=now;
+  const moved=Math.min(drag.H, Math.max(0,along));
+  w.style.height=(drag.show ? moved : drag.H-moved)+"px";
 });
 function endDrag(e, cancel){
   const d=drag; drag=null;
   if(!d||!d.active) return;
   blockClick();
-  const hide=!cancel && (e.clientY-d.y>d.H*0.35 || d.vy>0.5);
+  const along=(e.clientY-d.y)*(d.show?-1:1);
+  const toggle=!cancel && (along>d.H*0.35 || d.vy>0.5);
+  const hide = d.show ? !toggle : toggle;
   const w=el.keysWrap;
   w.style.transition="height .2s ease-out";
   void w.offsetHeight;
@@ -575,7 +583,7 @@ function endDrag(e, cancel){
   const finish=()=>{
     if(finished) return; finished=true;
     w.style.transition="none";
-    if(hide) setKeys(true);
+    setKeys(hide);
     w.style.height="";
     void w.offsetHeight;
     w.style.transition="";
@@ -583,15 +591,8 @@ function endDrag(e, cancel){
   w.addEventListener("transitionend",finish,{once:true});
   setTimeout(finish,260);
 }
-addEventListener("pointerup",e=>{
-  const st=swipeStart; swipeStart=null;
-  if(st){
-    const dy=e.clientY-st.y, dx=e.clientX-st.x;
-    if(dy<-45 && -dy>Math.abs(dx)*1.5){ setKeys(false); blockClick(); }
-  }
-  endDrag(e,false);
-});
-addEventListener("pointercancel",e=>{ swipeStart=null; endDrag(e,true); });
+addEventListener("pointerup",e=>endDrag(e,false));
+addEventListener("pointercancel",e=>endDrag(e,true));
 el.grip.addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
 el.grip.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
 

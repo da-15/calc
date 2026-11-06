@@ -35,7 +35,7 @@ html{height:100%;overflow:hidden;overscroll-behavior:none;background:linear-grad
 body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--panel);color:var(--fg);
   font:14px/1.5 var(--sans);-webkit-text-size-adjust:100%;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
 .app{height:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:4px;padding-block:12px 16px}
 .screen{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:8px 0}
 
@@ -53,6 +53,11 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .history .ans.off{opacity:.45;cursor:default}
 .history .ans.bad{color:var(--err);font-family:var(--sans);font-size:15px;cursor:default}
 .history .row.changed .ans{animation:flash 1.4s ease-out}
+.history .ans.holding{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);opacity:1}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);z-index:30;
+  background:var(--fg);color:var(--panel);font:500 14px var(--sans);padding:8px 16px;border-radius:999px;white-space:nowrap;
+  pointer-events:none;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
 .ref{display:inline-block;line-height:1.3;background:var(--ref-bg);color:var(--accent);
   border:1px solid transparent;border-radius:7px;padding:0 6px}
@@ -152,6 +157,8 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="scrim" id="modal" hidden>
   <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="m-title" aria-describedby="m-body">
@@ -265,10 +272,9 @@ function fmt(v){
   return sign+a.toLocaleString("en-US",{maximumSignificantDigits:15});
 }
 // 式に書ける形の数字（マイナスは括弧付き）
-function numLit(v){
-  const s=Math.abs(clean(v)).toLocaleString("en-US",{useGrouping:false,maximumSignificantDigits:15});
-  return v<0 ? "(−"+s+")" : s;
-}
+// カンマなし・省略なしの数字（有効15桁）
+const plain = v => Math.abs(clean(v)).toLocaleString("en-US",{useGrouping:false,maximumSignificantDigits:15});
+const numLit = v => v<0 ? "(−"+plain(v)+")" : plain(v);
 // 途中の式から、計算できる形を作る：末尾の演算子などを外し、閉じ括弧を補う
 function complete(s){
   while(/[+−×÷(.]$/.test(s)) s=s.slice(0,-1);
@@ -463,7 +469,7 @@ function renderHistory(){
   el.history.innerHTML=history.map((x,i)=>{
     const ans = !isFinite(x.v) ? `<span class="ans bad">エラー</span>`
       : i<editIdx ? `<button class="ans" data-id="${x.id}" aria-label="${fmt(x.v)} を式に入れる">${fmt(x.v)}</button>`
-      : `<span class="ans off">${fmt(x.v)}</span>`;
+      : `<span class="ans off" data-id="${x.id}">${fmt(x.v)}</span>`;
     const cls = "row"+(x.id===editing?" editing":"")+(flash.has(x.id)?" changed":"");
     return `<div class="${cls}" data-id="${x.id}"><button class="ex" aria-label="この行を編集">${pretty(x.e)}</button><span class="tail">=${ans}</span></div>`;
   }).join("");
@@ -503,6 +509,7 @@ el.modal.addEventListener("click",e=>{ if(e.target===el.modal) closeModal(); });
 
 /* ---- 操作 ---- */
 el.history.addEventListener("click",e=>{
+  if(skipClick){ skipClick=false; return; }   // 長押しでコピーした直後のクリックは無視する
   const a=e.target.closest("button.ans"); if(a){ insertRef(+a.dataset.id); return; }
   const x=e.target.closest(".row"); if(x) startEdit(+x.dataset.id);
 });
@@ -525,6 +532,47 @@ el.expr.addEventListener("click",e=>{
   }
   render();
 });
+/* ---- 答えを長押しでコピー ---- */
+// iPhoneは指を離したとき（タッチ操作の中）でないとコピーできないので、
+// 長押しが成立したら答えの色を変えて知らせ、指を離したときにコピーする
+let hold=null, skipClick=false, toastTimer=null;
+function showToast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1600);
+}
+function cancelHold(){ if(!hold) return; clearTimeout(hold.timer); hold.el.classList.remove("holding"); hold=null; }
+function copyText(text){
+  const done=ok=>showToast(ok ? "コピーしました："+text : "コピーできませんでした");
+  const fallback=()=>{
+    const ta=document.createElement("textarea");
+    ta.value=text; ta.readOnly=true; ta.style.cssText="position:fixed;top:0;left:0;opacity:0;-webkit-user-select:text;user-select:text";
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,text.length);
+    let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+    ta.remove(); return ok;
+  };
+  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(()=>done(true),()=>done(fallback()));
+  else done(fallback());
+}
+function finishHold(e){
+  if(!hold) return false;
+  const h=hold; cancelHold();
+  if(!h.ready) return false;
+  const row=byId(h.id);
+  if(row && isFinite(row.v)) copyText((row.v<0?"-":"")+plain(row.v));
+  skipClick=true; setTimeout(()=>{ skipClick=false; },400);
+  return true;
+}
+el.history.addEventListener("pointerdown",e=>{
+  const a=e.target.closest(".ans[data-id]"); if(!a) return;
+  cancelHold();
+  hold={el:a, id:+a.dataset.id, x:e.clientX, y:e.clientY, ready:false,
+    timer:setTimeout(()=>{ if(hold){ hold.ready=true; a.classList.add("holding"); } },500)};
+});
+el.history.addEventListener("pointermove",e=>{ if(hold && Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>10) cancelHold(); });
+el.history.addEventListener("pointercancel",cancelHold);
+el.history.addEventListener("scroll",cancelHold,{passive:true});
+el.history.addEventListener("pointerup",e=>{ if(e.pointerType!=="touch") finishHold(e); });
+el.history.addEventListener("touchend",e=>{ if(finishHold(e)) e.preventDefault(); });   // コピーしたらタップ扱いにしない
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
 $("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });

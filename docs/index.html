@@ -76,7 +76,9 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .expr .ghost{color:var(--ghost)}
 .expr .tok{border-radius:4px}
 .expr .tok.sel{background:var(--ref-bg);outline:2px solid var(--accent);outline-offset:0}
-.expr .tok.sel .ref{background:none}
+/* 参照の札を選んだときは、札そのものに枠を付けて背景と枠をぴったり重ねる */
+.expr .tok.sel.k-ref{background:none;outline:none}
+.expr .tok.sel .ref{outline:2px solid var(--accent);outline-offset:-1px}
 .expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
 .result{font-weight:500;color:var(--muted)}

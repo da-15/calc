@@ -53,11 +53,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .history .ans.off{opacity:.45;cursor:default}
 .history .ans.bad{color:var(--err);font-family:var(--sans);font-size:15px;cursor:default}
 .history .row.changed .ans{animation:flash 1.4s ease-out}
-.history .ans.holding{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);opacity:1}
-.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);z-index:30;
-  background:var(--fg);color:var(--panel);font:500 14px var(--sans);padding:8px 16px;border-radius:999px;white-space:nowrap;
-  pointer-events:none;opacity:0;transition:opacity .2s}
-.toast.show{opacity:1}
+.history .row.picked{box-shadow:inset 0 0 0 2px var(--accent)}
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
 .ref{display:inline-block;line-height:1.3;background:var(--ref-bg);color:var(--accent);
   border:1px solid transparent;border-radius:7px;padding:0 6px}
@@ -68,10 +64,11 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .label.editing #exprLabel{color:var(--accent);font-weight:700}
 .lab-right{display:flex;align-items:center;gap:8px}
 #parenInfo.warn{color:var(--err);letter-spacing:0}
-.editbar{display:flex;align-items:center;gap:6px}
-.editbar button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;
+.bar{display:flex;align-items:center;gap:6px}
+.bar button{white-space:nowrap;appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;
   height:28px;padding:0 12px;line-height:1;font:700 13px var(--sans);cursor:pointer}
-.editbar .del{background:var(--err);border-color:var(--err);color:var(--panel)}
+.bar button:disabled{opacity:.45}
+.bar .del{background:var(--err);border-color:var(--err);color:var(--panel)}
 
 /* 入力中の式 */
 .expr{flex:none;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
@@ -127,7 +124,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 <div class="app">
   <section class="screen">
     <div class="history" id="history"></div>
-    <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="editbar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
+    <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="bar" id="copyBar" hidden><button id="c-expr">式をコピー</button><button id="c-ans">答えをコピー</button></span><span class="bar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
     <div class="expr" id="expr" aria-live="polite"><span class="line"><span id="exprText"></span><wbr><span class="result" id="result"></span></span></div>
   </section>
   <div class="keyarea" id="keyarea">
@@ -158,8 +155,6 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
   </div>
 </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-
 <div class="scrim" id="modal" hidden>
   <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="m-title" aria-describedby="m-body">
     <p class="m-title" id="m-title">履歴をすべて消しますか？</p>
@@ -185,13 +180,14 @@ let lastId = null;      // 直前に確定した行
 let history = [];       // {id, e:式, v:答え}
 let nextId = 1;
 let editing = null;     // 編集中の行のID
+let copying = null;     // 長押しでコピーのボタンを出している行のID
 let historyDirty = true;   // 履歴の表示を描き直す必要があるか
 let scrollToEnd = true;    // 新しい行が増えたときだけ、履歴をいちばん下まで送る
 const flash = new Set();   // 再計算で答えが変わった行
 
 const $ = id => document.getElementById(id);
 const el = { history:$("history"), expr:$("expr"), exprText:$("exprText"), result:$("result"), label:$("exprLabel"),
-  parenInfo:$("parenInfo"), editBar:$("editBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
+  parenInfo:$("parenInfo"), editBar:$("editBar"), copyBar:$("copyBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
 const isDigit = c => c>="0" && c<="9";
 const endsOperand = c => isDigit(c) || c===")" || c==="]" || c==="." || c==="%";
 const opens = s => { let n=0; for(const c of s){ if(c==="(") n++; else if(c===")") n--; } return n; };
@@ -310,6 +306,7 @@ function pushRow(e,v){
 /* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
 function press(k){
+  clearCopy();
   if(!el.modal.hidden) return;
   // 入力欄が空のときのACは、履歴をすべて消す確認を出す（行の編集中は除く）
   if(k==="C" && expr==="" && editing===null && history.length){ openModal(); return; }
@@ -420,7 +417,7 @@ function equals(){
 function showError(msg){ el.result.className="result err"; el.result.textContent=msg; }
 
 /* ---- 行の編集 ---- */
-function startEdit(id){ editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
+function startEdit(id){ clearCopy(); editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
 function cancelEdit(){ editing=null; setExpr(""); done=false; historyDirty=true; render(); }
 function deleteEditing(){
   const id=editing; editing=null; removeRow(id); recalc(true); save();
@@ -428,6 +425,7 @@ function deleteEditing(){
 }
 // 過去の答えを参照として式に入れる（編集中は、その行より上の答えだけ）
 function insertRef(id){
+  clearCopy();
   done=false;
   let b,a;
   if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
@@ -470,17 +468,23 @@ function renderHistory(){
     const ans = !isFinite(x.v) ? `<span class="ans bad">エラー</span>`
       : i<editIdx ? `<button class="ans" data-id="${x.id}" aria-label="${fmt(x.v)} を式に入れる">${fmt(x.v)}</button>`
       : `<span class="ans off" data-id="${x.id}">${fmt(x.v)}</span>`;
-    const cls = "row"+(x.id===editing?" editing":"")+(flash.has(x.id)?" changed":"");
+    const cls = "row"+(x.id===editing?" editing":"")+(x.id===copying?" picked":"")+(flash.has(x.id)?" changed":"");
     return `<div class="${cls}" data-id="${x.id}"><button class="ex" aria-label="この行を編集">${pretty(x.e)}</button><span class="tail">=${ans}</span></div>`;
   }).join("");
   flash.clear();
   if(scrollToEnd){ el.history.scrollTop=el.history.scrollHeight; scrollToEnd=false; }
-  el.editBar.hidden = editing===null;
   el.label.textContent = editing===null ? "式" : "行を編集";
   el.label.parentNode.classList.toggle("editing", editing!==null);
   historyDirty=false;
 }
+// 式の段の右側：コピーのボタンを出している間は、ほかの表示を隠す
+function updateBars(){
+  el.copyBar.hidden = copying===null;
+  el.editBar.hidden = editing===null || copying!==null;
+  el.parenInfo.hidden = copying!==null;
+}
 function render(){
+  updateBars();
   if(historyDirty) renderHistory();
   if(pos>expr.length||pos<0) pos=expr.length;
   const open=opens(expr);
@@ -504,18 +508,20 @@ function openModal(){
 }
 const closeModal = () => { el.modal.hidden=true; };
 $("m-cancel").addEventListener("click",closeModal);
-$("m-ok").addEventListener("click",()=>{ history=[]; editing=null; historyDirty=true; save(); setExpr(""); done=false; closeModal(); render(); });
+$("m-ok").addEventListener("click",()=>{ copying=null; history=[]; editing=null; historyDirty=true; save(); setExpr(""); done=false; closeModal(); render(); });
 el.modal.addEventListener("click",e=>{ if(e.target===el.modal) closeModal(); });
 
 /* ---- 操作 ---- */
 el.history.addEventListener("click",e=>{
-  if(skipClick){ skipClick=false; return; }   // 長押しでコピーした直後のクリックは無視する
+  if(skipClick){ skipClick=false; return; }   // 長押しした直後のクリックは無視する
+  clearCopy();
   const a=e.target.closest("button.ans"); if(a){ insertRef(+a.dataset.id); return; }
   const x=e.target.closest(".row"); if(x) startEdit(+x.dataset.id);
 });
 // 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
 el.expr.addEventListener("click",e=>{
   if(!el.modal.hidden||suppressClick) return;
+  clearCopy();
   if(keysHidden) setKeys(false);    // 隠れているときに式をタップしたらテンキーを戻す
   done=false;
   const t=e.target.closest(".tok");
@@ -532,17 +538,20 @@ el.expr.addEventListener("click",e=>{
   }
   render();
 });
-/* ---- 答えを長押しでコピー ---- */
-// iPhoneは指を離したとき（タッチ操作の中）でないとコピーできないので、
-// 長押しが成立したら答えの色を変えて知らせ、指を離したときにコピーする
-let hold=null, skipClick=false, toastTimer=null;
-function showToast(msg){
-  const t=$("toast"); t.textContent=msg; t.classList.add("show");
-  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),1600);
+/* ---- 履歴の行を長押しでコピー ---- */
+// iPhoneはタップの中でしかコピーできないので、長押しでは「式をコピー」「答えをコピー」のボタンを出し、
+// ボタンのタップでコピーする
+let hold=null, skipClick=false;
+function clearCopy(){
+  if(copying===null) return;
+  copying=null;
+  el.history.querySelector(".row.picked")?.classList.remove("picked");
+  updateBars();
 }
-function cancelHold(){ if(!hold) return; clearTimeout(hold.timer); hold.el.classList.remove("holding"); hold=null; }
+// 式の参照は数字に置き換え、カンマなしで
+const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
 function copyText(text){
-  const done=ok=>showToast(ok ? "コピーしました："+text : "コピーできませんでした");
+  const failed=()=>{ el.parenInfo.textContent="コピーできませんでした"; el.parenInfo.classList.add("warn"); };
   const fallback=()=>{
     const ta=document.createElement("textarea");
     ta.value=text; ta.readOnly=true; ta.style.cssText="position:fixed;top:0;left:0;opacity:0;-webkit-user-select:text;user-select:text";
@@ -550,29 +559,33 @@ function copyText(text){
     let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
     ta.remove(); return ok;
   };
-  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(()=>done(true),()=>done(fallback()));
-  else done(fallback());
+  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(()=>{ if(!fallback()) failed(); });
+  else if(!fallback()) failed();
 }
-function finishHold(e){
-  if(!hold) return false;
-  const h=hold; cancelHold();
-  if(!h.ready) return false;
-  const row=byId(h.id);
-  if(row && isFinite(row.v)) copyText((row.v<0?"-":"")+plain(row.v));
-  skipClick=true; setTimeout(()=>{ skipClick=false; },400);
-  return true;
+function copyRow(kind){
+  const h=byId(copying); clearCopy();
+  if(!h) return;
+  if(kind==="ans"){ if(isFinite(h.v)) copyText((h.v<0?"-":"")+plain(h.v)); }
+  else copyText(exprForCopy(h.e));
 }
+$("c-expr").addEventListener("click",()=>copyRow("expr"));
+$("c-ans").addEventListener("click",()=>copyRow("ans"));
+const cancelHold = () => { if(hold){ clearTimeout(hold.timer); hold=null; } };
 el.history.addEventListener("pointerdown",e=>{
-  const a=e.target.closest(".ans[data-id]"); if(!a) return;
+  skipClick=false;
+  const row=e.target.closest(".row"); if(!row) return;
   cancelHold();
-  hold={el:a, id:+a.dataset.id, x:e.clientX, y:e.clientY, ready:false,
-    timer:setTimeout(()=>{ if(hold){ hold.ready=true; a.classList.add("holding"); } },500)};
+  hold={x:e.clientX, y:e.clientY, timer:setTimeout(()=>{
+    hold=null; clearCopy();
+    copying=+row.dataset.id; row.classList.add("picked");
+    $("c-ans").disabled=!isFinite(byId(copying)?.v);
+    skipClick=true; updateBars();
+  },500)};
 });
 el.history.addEventListener("pointermove",e=>{ if(hold && Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>10) cancelHold(); });
-el.history.addEventListener("pointercancel",cancelHold);
+for(const ev of ["pointerup","pointercancel"]) el.history.addEventListener(ev,cancelHold);
 el.history.addEventListener("scroll",cancelHold,{passive:true});
-el.history.addEventListener("pointerup",e=>{ if(e.pointerType!=="touch") finishHold(e); });
-el.history.addEventListener("touchend",e=>{ if(finishHold(e)) e.preventDefault(); });   // コピーしたらタップ扱いにしない
+el.history.addEventListener("touchend",e=>{ if(skipClick) e.preventDefault(); });   // 長押しのあとはタップ扱いにしない
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
 $("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });

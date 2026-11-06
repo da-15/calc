@@ -71,7 +71,8 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 /* 入力中の式 */
 .expr{flex:none;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
   font-family:var(--mono);font-size:20px;line-height:1.5;text-align:right;overflow-wrap:anywhere;
-  border-top:1px solid var(--line);padding-top:8px}
+  border-top:1px solid var(--line);padding-top:8px;
+  margin-inline:-3px;padding-inline:3px}   /* 端の数字に付ける枠が切れないよう、左右に少し余白を取る */
 .expr .line{display:block}
 .expr .ghost{color:var(--ghost)}
 .expr .tok{border-radius:4px}
@@ -79,7 +80,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 /* 参照の札を選んだときは、札そのものに枠を付けて背景と枠をぴったり重ねる */
 .expr .tok.sel.k-ref{background:none;outline:none}
 .expr .tok.sel .ref{outline:2px solid var(--accent);outline-offset:-1px}
-.expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+.expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin:0 -3px 0 1px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
 .result{font-weight:500;color:var(--muted)}
 .result.err{color:var(--err);font-family:var(--sans);font-size:15px;margin-left:8px}
@@ -122,7 +123,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
   <section class="screen">
     <div class="history" id="history"></div>
     <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="editbar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
-    <div class="expr" id="expr" aria-live="polite"><span class="line"><span id="exprText"></span><span class="result" id="result"></span></span></div>
+    <div class="expr" id="expr" aria-live="polite"><span class="line"><span id="exprText"></span><wbr><span class="result" id="result"></span></span></div>
   </section>
   <div class="keyarea" id="keyarea">
     <div class="grip" id="grip" role="button" tabindex="0" aria-label="テンキーを隠す"></div>

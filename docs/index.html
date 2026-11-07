@@ -663,6 +663,10 @@ watchHold(el.history, e=>{
   return ()=>{ copying=+row.dataset.id; row.classList.add("picked"); $("c-ans").disabled=!isFinite(byId(copying)?.v); };
 });
 watchHold(el.expr, ()=>()=>{ pasting=true; });
+// クリックやタップでボタンにフォーカスを移さない。
+// フォーカスが残ると、キーボードを使ったときに枠線が出たり、スペースキーでそのボタンがもう一度押されたりするため。
+// Tabキーで移動したときの枠線はそのまま出す
+document.addEventListener("mousedown",e=>{ if(e.target.closest("button,[tabindex]")) e.preventDefault(); });
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
 $("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });

@@ -19,6 +19,7 @@
 :root{
   --bg:#eef0f2; --panel:#ffffff; --key:#ffffff; --key-op:#e3e9ee; --fg:#1d2730; --muted:#6c7a86;
   --accent:#0f6e74; --accent-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
+  --fs:20px;   /* 履歴と入力欄の文字の大きさ（ピンチで変える） */
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,"Noto Sans JP",sans-serif;
   color-scheme:light;
@@ -41,22 +42,22 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 
 /* 履歴 */
 .history{flex:1 1 0;min-height:0;overflow-y:auto;margin-inline:-4px;display:flex;flex-direction:column;gap:6px;
-  font-family:var(--mono);font-size:20px;color:var(--muted);text-align:right}
+  font-family:var(--mono);font-size:var(--fs);color:var(--muted);text-align:right}
 .history>.row:first-child{margin-top:auto}
 .history .row{border-radius:8px;padding:2px 4px;cursor:pointer}
 .history .row.editing{background:var(--ref-bg);color:var(--fg)}
 .history .ex{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;text-align:right;cursor:pointer;overflow-wrap:anywhere}
 .history .tail{display:inline-block;white-space:nowrap;max-width:100%}
-.history .ans{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);font:400 20px var(--mono);
-  display:inline-block;line-height:1.3;border-radius:7px;padding:0 6px;cursor:pointer}
+.history .ans{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);font:400 1em var(--mono);
+  display:inline-block;line-height:1.3;border-radius:.35em;padding:0 .3em;cursor:pointer}
 .history .ans:active{filter:brightness(.92)}
 .history .ans.off{opacity:.45;cursor:default}
-.history .ans.bad{color:var(--err);font-family:var(--sans);font-size:15px;cursor:default}
+.history .ans.bad{color:var(--err);font-family:var(--sans);font-size:.75em;cursor:default}
 .history .row.changed .ans{animation:flash 1.4s ease-out}
 .history .row.picked{box-shadow:inset 0 0 0 2px var(--accent)}
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
 .ref{display:inline-block;line-height:1.3;background:var(--ref-bg);color:var(--accent);
-  border:1px solid transparent;border-radius:7px;padding:0 6px}
+  border:1px solid transparent;border-radius:.35em;padding:0 .3em}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* 式のラベルと編集中のボタン */
@@ -72,7 +73,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 
 /* 入力中の式 */
 .expr{flex:none;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
-  font-family:var(--mono);font-size:20px;line-height:1.5;text-align:right;overflow-wrap:anywhere;
+  font-family:var(--mono);font-size:var(--fs);line-height:1.5;text-align:right;overflow-wrap:anywhere;
   border-top:1px solid var(--line);padding-top:8px;
   margin-inline:-3px;padding-inline:3px}   /* 端の数字に付ける枠が切れないよう、左右に少し余白を取る */
 .expr .line{display:block}
@@ -85,7 +86,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin:0 -3px 0 1px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
 .result{font-weight:500;color:var(--muted)}
-.result.err{color:var(--err);font-family:var(--sans);font-size:15px;margin-left:8px}
+.result.err{color:var(--err);font-family:var(--sans);font-size:.75em;margin-left:.4em}
 
 /* テンキー：グレーの帯にして、画面の左右と下の端まで広げる */
 .keyarea{display:flex;flex-direction:column;touch-action:none;flex:none;padding-top:2px;
@@ -637,6 +638,7 @@ $("p-paste").addEventListener("click",()=>{
 // ボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
 document.addEventListener("pointerdown",()=>{ skipClick=false; },true);
 document.addEventListener("click",e=>{
+  if(performance.now()<noClickUntil){ e.stopPropagation(); e.preventDefault(); return; }   // ピンチの直後のクリックは無視する
   if(skipClick){ skipClick=false; e.stopPropagation(); e.preventDefault(); return; }   // 長押しした直後のクリックは無視する
   if((copying!==null||pasting) && !el.copyBar.contains(e.target) && !el.pasteBar.contains(e.target)){ closeMenu(); e.stopPropagation(); e.preventDefault(); }
 },true);
@@ -693,6 +695,7 @@ el.keyarea.addEventListener("pointerdown",startDrag);
 for(const t of [el.expr, document.querySelector(".label")]) t.addEventListener("pointerdown",e=>{ if(keysHidden) startDrag(e); });
 addEventListener("pointermove",e=>{
   if(!drag) return;
+  if(pinch && !drag.active){ drag=null; return; }
   const dir=drag.show?-1:1, along=(e.clientY-drag.y)*dir, dx=e.clientX-drag.x, w=el.keysWrap;
   if(!drag.active){
     if(along>10 && along>Math.abs(dx)*1.5){
@@ -734,6 +737,49 @@ addEventListener("pointerup",e=>endDrag(e,false));
 addEventListener("pointercancel",e=>endDrag(e,true));
 el.grip.addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
 el.grip.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
+
+/* ---- ピンチで文字の大きさを変える ---- */
+const FS_MIN=14, FS_MAX=32, FS_KEY="calc-font-size";
+let fs=20, pinch=null, noClickUntil=0;
+try{ const v=parseFloat(localStorage.getItem(FS_KEY)); if(v>=FS_MIN&&v<=FS_MAX) fs=v; }catch(e){}
+document.documentElement.style.setProperty("--fs", fs+"px");
+const saveFs = () => { try{ localStorage.setItem(FS_KEY, String(fs)); }catch(e){} };
+// 大きさを変える。履歴がいちばん下ならそのまま下に、途中なら指の間にある行が動かないようにする
+function setFs(v, focalY){
+  v=Math.round(Math.min(FS_MAX, Math.max(FS_MIN, v))*2)/2;
+  if(v===fs) return;
+  const h=el.history, atBottom = h.scrollHeight-h.scrollTop-h.clientHeight<4;
+  let anchor=null;
+  if(!atBottom) for(const r of h.children){ const b=r.getBoundingClientRect(); if(b.bottom>=focalY){ anchor={r, top:b.top}; break; } }
+  fs=v; document.documentElement.style.setProperty("--fs", fs+"px");
+  if(atBottom) h.scrollTop=h.scrollHeight;
+  else if(anchor) h.scrollTop += anchor.r.getBoundingClientRect().top - anchor.top;
+  if(pos===expr.length) el.expr.scrollTop=el.expr.scrollHeight;
+}
+const screenEl=document.querySelector(".screen");
+const dist = t => Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+screenEl.addEventListener("touchstart",e=>{
+  if(e.touches.length!==2) return;
+  cancelHold();   // 2本目の指が触れたら、長押しやタップはやめてピンチだけを扱う
+  pinch={d:dist(e.touches), fs};
+},{passive:true});
+screenEl.addEventListener("touchmove",e=>{
+  if(!pinch || e.touches.length<2) return;
+  e.preventDefault();   // 画面全体の拡大やスクロールをさせない
+  setFs(pinch.fs*dist(e.touches)/pinch.d, (e.touches[0].clientY+e.touches[1].clientY)/2);
+},{passive:false});
+for(const ev of ["touchend","touchcancel"]) screenEl.addEventListener(ev,e=>{
+  if(!pinch || e.touches.length>=2) return;
+  pinch=null; saveFs(); noClickUntil=performance.now()+400;
+});
+// iPhoneのSafari独自のピンチ（画面全体の拡大）を止める
+for(const ev of ["gesturestart","gesturechange"]) document.addEventListener(ev,e=>e.preventDefault());
+// パソコンでは、トラックパッドのピンチや Ctrl+マウスホイールでも変えられる
+screenEl.addEventListener("wheel",e=>{
+  if(!e.ctrlKey) return;
+  e.preventDefault();
+  setFs(fs*Math.exp(-e.deltaY*0.01), e.clientY); saveFs();
+},{passive:false});
 
 load();
 render();

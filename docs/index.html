@@ -430,9 +430,10 @@ function insertRef(id){
   done=false;
   let b,a;
   if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  // 前後に記号がなければ「+」でつなぐ（答えを足していく使い方が多いため）
   const L=b.slice(-1);
-  if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"×";
-  b+="["+id+"]"; expr=b+joinRight(b,a)+a; pos=b.length; render();
+  if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"+";
+  b+="["+id+"]"; expr=b+(joinRight(b,a)?"+":"")+a; pos=b.length; render();
 }
 
 /* ---- 表示 ---- */

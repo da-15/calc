@@ -595,6 +595,18 @@ function pasteText(text){
   b+=ins; expr=b+joinRight(b,a)+a; pos=b.length;
   render();
 }
+// パソコンでは Ctrl+C（Macは⌘+C）で、入力欄で選んでいる数字、なければ入力中の式全体をコピーする（入力欄が空なら何もしない）
+document.addEventListener("copy",e=>{
+  if(!el.modal.hidden) return;
+  let t="";
+  if(sel){
+    const x=expr.slice(sel.a,sel.b);
+    if(x.startsWith("[")){ const h=byId(+x.slice(1,-1)); if(h&&isFinite(h.v)) t=(h.v<0?"-":"")+plain(h.v); }
+    else t=x;
+  } else if(expr) t=exprForCopy(expr);
+  if(!t) return;
+  e.clipboardData.setData("text/plain",t); e.preventDefault();
+});
 // パソコンでは Ctrl+V（Macは⌘+V）でも貼り付けられる。キーボードでの貼り付けは確認なしで読める
 document.addEventListener("paste",e=>{
   if(!el.modal.hidden) return;

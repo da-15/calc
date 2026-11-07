@@ -589,6 +589,7 @@ el.history.addEventListener("pointermove",e=>{ if(hold && Math.hypot(e.clientX-h
 for(const ev of ["pointerup","pointercancel"]) el.history.addEventListener(ev,cancelHold);
 el.history.addEventListener("scroll",cancelHold,{passive:true});
 el.history.addEventListener("touchend",e=>{ if(skipClick) e.preventDefault(); });   // 長押しのあとはタップ扱いにしない
+el.history.addEventListener("contextmenu",e=>e.preventDefault());   // Androidで長押ししたときのメニューを出さない
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
 $("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });

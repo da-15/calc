@@ -1,0 +1,13 @@
+{
+  "name": "calc",
+  "private": true,
+  "description": "式が見える電卓（PWA）のテスト用",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:calc": "node --test tests/calc.test.js",
+    "serve": "npx --yes http-server docs -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

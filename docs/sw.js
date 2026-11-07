@@ -1,10 +1,14 @@
 // 式が見える電卓：オフライン用のキャッシュ
 // ファイルを更新したら CACHE の番号を上げると、次の起動で新しい版に入れ替わる
+// docs/ にファイルを増やしたときは、下の FILES にも足す
 // アイコンを差し替えたときは、index.html と manifest の「?v=」の番号も上げる（端末が古い画像を覚えているため）
-const CACHE = "calc-v28";
+const CACHE = "calc-v29";
 const FILES = [
   "./",
   "./index.html",
+  "./style.css",
+  "./calc.js",
+  "./app.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

@@ -182,6 +182,7 @@ let nextId = 1;
 let editing = null;     // 編集中の行のID
 let copying = null;     // 長押しでコピーのボタンを出している行のID
 let pasting = false;    // 長押しで貼り付けのボタンを出しているか
+let note = "";          // 式の段に出しているエラーのメッセージ
 let historyDirty = true;   // 履歴の表示を描き直す必要があるか
 let scrollToEnd = true;    // 新しい行が増えたときだけ、履歴をいちばん下まで送る
 const flash = new Set();   // 再計算で答えが変わった行
@@ -479,25 +480,28 @@ function renderHistory(){
   el.label.parentNode.classList.toggle("editing", editing!==null);
   historyDirty=false;
 }
-// 式の段の右側：コピーのボタンを出している間は、ほかの表示を隠す
+// 式の段の右側：コピー・貼り付けのボタンを出している間は、ほかの表示を隠す。
+// エラーのメッセージを出している間は、編集のボタンを隠してメッセージを優先する
 function updateBars(){
   const menu = copying!==null || pasting;
   el.copyBar.hidden = copying===null;
   el.pasteBar.hidden = !pasting;
-  el.editBar.hidden = editing===null || menu;
+  el.editBar.hidden = editing===null || menu || note!=="";
   el.parenInfo.hidden = menu;
 }
-function render(){
+function updateInfo(){
+  const open=opens(expr), full = editing===null && expr!=="" && history.length>=LIMIT;
+  el.parenInfo.textContent = note || (full ? `上限${LIMIT}件です。確定すると最古の行が消えます。` : open>0 ? `閉じていない括弧 ${open}` : "");
+  el.parenInfo.classList.toggle("warn", note!=="" || full);
   updateBars();
+}
+function render(){
   if(historyDirty) renderHistory();
   if(pos>expr.length||pos<0) pos=expr.length;
   const open=opens(expr);
   el.exprText.innerHTML = liveExprHtml() + `<span class="ghost">${")".repeat(Math.max(0,open))}</span>`;
   if(pos===expr.length) el.expr.scrollTop = el.expr.scrollHeight;
-  const full = editing===null && expr!=="" && history.length>=LIMIT;
-  el.parenInfo.textContent = full ? `上限${LIMIT}件です。確定すると最古の行が消えます。`
-    : open>0 ? `閉じていない括弧 ${open}` : "";
-  el.parenInfo.classList.toggle("warn", full);
+  updateInfo();
   // 途中の式でも答えを先に見せる
   const s=complete(expr);
   let v=null; if(s){ try{ v=evaluate(s); }catch(e){ v=e; } }
@@ -550,7 +554,11 @@ function closeMenu(){
   el.history.querySelector(".row.picked")?.classList.remove("picked");
   updateBars();
 }
-function showNote(msg){ el.parenInfo.textContent=msg; el.parenInfo.classList.add("warn"); }
+// エラーのメッセージ。次に画面のどこかを触るか、キーを押すと消える
+function showNote(msg){ note=msg; updateInfo(); }
+function clearNote(){ if(note){ note=""; updateInfo(); } }
+document.addEventListener("pointerdown",clearNote,true);
+document.addEventListener("keydown",clearNote,true);
 // 式の参照は数字に置き換え、カンマなしで
 const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
 function copyText(text){

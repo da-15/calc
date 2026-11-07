@@ -595,15 +595,21 @@ function pasteText(text){
   b+=ins; expr=b+joinRight(b,a)+a; pos=b.length;
   render();
 }
-// パソコンでは Ctrl+C（Macは⌘+C）で、入力欄で選んでいる数字、なければ入力中の式全体をコピーする（入力欄が空なら何もしない）
+// パソコンでは Ctrl+C（Macは⌘+C）で、入力欄で選んでいる数字、なければ入力中の式と答えをコピーする（入力欄が空なら何もしない）
 document.addEventListener("copy",e=>{
   if(!el.modal.hidden) return;
   let t="";
-  if(sel){
-    const x=expr.slice(sel.a,sel.b);
-    if(x.startsWith("[")){ const h=byId(+x.slice(1,-1)); if(h&&isFinite(h.v)) t=(h.v<0?"-":"")+plain(h.v); }
-    else t=x;
-  } else if(expr) t=exprForCopy(expr);
+  // 数字（参照）を選んでいるとき、または入力欄が数字1つだけのときは、その数字だけ
+  const one = sel ? expr.slice(sel.a,sel.b) : /^−?([0-9.]+|\[\d+\])$/.test(expr) ? expr : null;
+  if(one){
+    let v=NaN; try{ v=evaluate(one); }catch(err){}
+    if(isFinite(v)) t=(v<0?"-":"")+plain(v);
+  } else if(expr){
+    // 計算できる式なら「式=答え」でコピーする（閉じていない括弧は補う。末尾が演算子などなら式だけ）
+    const full=expr+")".repeat(Math.max(0,opens(expr)));
+    let v=NaN; try{ v=evaluate(full); }catch(err){}
+    t = isFinite(v) ? exprForCopy(full)+"="+(v<0?"−":"")+plain(v) : exprForCopy(expr);
+  }
   if(!t) return;
   e.clipboardData.setData("text/plain",t); e.preventDefault();
 });

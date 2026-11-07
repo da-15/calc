@@ -124,7 +124,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 <div class="app">
   <section class="screen">
     <div class="history" id="history"></div>
-    <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="bar" id="copyBar" hidden><button id="c-expr">式をコピー</button><button id="c-ans">答えをコピー</button></span><span class="bar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
+    <div class="label"><span id="exprLabel">式</span><span class="lab-right"><span id="parenInfo"></span><span class="bar" id="copyBar" hidden><button id="c-expr">式をコピー</button><button id="c-ans">答えをコピー</button></span><span class="bar" id="pasteBar" hidden><button id="p-paste">貼り付け</button></span><span class="bar" id="editBar" hidden><button class="del" id="e-del">行を削除</button><button id="e-cancel">やめる</button></span></span></div>
     <div class="expr" id="expr" aria-live="polite"><span class="line"><span id="exprText"></span><wbr><span class="result" id="result"></span></span></div>
   </section>
   <div class="keyarea" id="keyarea">
@@ -181,13 +181,14 @@ let history = [];       // {id, e:式, v:答え}
 let nextId = 1;
 let editing = null;     // 編集中の行のID
 let copying = null;     // 長押しでコピーのボタンを出している行のID
+let pasting = false;    // 長押しで貼り付けのボタンを出しているか
 let historyDirty = true;   // 履歴の表示を描き直す必要があるか
 let scrollToEnd = true;    // 新しい行が増えたときだけ、履歴をいちばん下まで送る
 const flash = new Set();   // 再計算で答えが変わった行
 
 const $ = id => document.getElementById(id);
 const el = { history:$("history"), expr:$("expr"), exprText:$("exprText"), result:$("result"), label:$("exprLabel"),
-  parenInfo:$("parenInfo"), editBar:$("editBar"), copyBar:$("copyBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
+  parenInfo:$("parenInfo"), editBar:$("editBar"), copyBar:$("copyBar"), pasteBar:$("pasteBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
 const isDigit = c => c>="0" && c<="9";
 const endsOperand = c => isDigit(c) || c===")" || c==="]" || c==="." || c==="%";
 const opens = s => { let n=0; for(const c of s){ if(c==="(") n++; else if(c===")") n--; } return n; };
@@ -306,7 +307,7 @@ function pushRow(e,v){
 /* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
 function press(k){
-  clearCopy();
+  closeMenu();
   if(!el.modal.hidden) return;
   // 入力欄が空のときのACは、履歴をすべて消す確認を出す（行の編集中は除く）
   if(k==="C" && expr==="" && editing===null && history.length){ openModal(); return; }
@@ -417,7 +418,7 @@ function equals(){
 function showError(msg){ el.result.className="result err"; el.result.textContent=msg; }
 
 /* ---- 行の編集 ---- */
-function startEdit(id){ clearCopy(); editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
+function startEdit(id){ closeMenu(); editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
 function cancelEdit(){ editing=null; setExpr(""); done=false; historyDirty=true; render(); }
 function deleteEditing(){
   const id=editing; editing=null; removeRow(id); recalc(true); save();
@@ -425,7 +426,7 @@ function deleteEditing(){
 }
 // 過去の答えを参照として式に入れる（編集中は、その行より上の答えだけ）
 function insertRef(id){
-  clearCopy();
+  closeMenu();
   done=false;
   let b,a;
   if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
@@ -479,9 +480,11 @@ function renderHistory(){
 }
 // 式の段の右側：コピーのボタンを出している間は、ほかの表示を隠す
 function updateBars(){
+  const menu = copying!==null || pasting;
   el.copyBar.hidden = copying===null;
-  el.editBar.hidden = editing===null || copying!==null;
-  el.parenInfo.hidden = copying!==null;
+  el.pasteBar.hidden = !pasting;
+  el.editBar.hidden = editing===null || menu;
+  el.parenInfo.hidden = menu;
 }
 function render(){
   updateBars();
@@ -508,7 +511,7 @@ function openModal(){
 }
 const closeModal = () => { el.modal.hidden=true; };
 $("m-cancel").addEventListener("click",closeModal);
-$("m-ok").addEventListener("click",()=>{ copying=null; history=[]; editing=null; historyDirty=true; save(); setExpr(""); done=false; closeModal(); render(); });
+$("m-ok").addEventListener("click",()=>{ copying=null; pasting=false; history=[]; editing=null; historyDirty=true; save(); setExpr(""); done=false; closeModal(); render(); });
 el.modal.addEventListener("click",e=>{ if(e.target===el.modal) closeModal(); });
 
 /* ---- 操作 ---- */
@@ -519,7 +522,7 @@ el.history.addEventListener("click",e=>{
 // 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
 el.expr.addEventListener("click",e=>{
   if(!el.modal.hidden||suppressClick) return;
-  clearCopy();
+  closeMenu();
   if(keysHidden) setKeys(false);    // 隠れているときに式をタップしたらテンキーを戻す
   done=false;
   const t=e.target.closest(".tok");
@@ -536,20 +539,21 @@ el.expr.addEventListener("click",e=>{
   }
   render();
 });
-/* ---- 履歴の行を長押しでコピー ---- */
-// iPhoneはタップの中でしかコピーできないので、長押しでは「式をコピー」「答えをコピー」のボタンを出し、
-// ボタンのタップでコピーする
+/* ---- 長押しでコピー・貼り付け ---- */
+// iPhoneはタップの中でしかクリップボードを使えないので、長押しではボタンを出し、ボタンのタップでコピー・貼り付けする。
+// 履歴の行の長押し：「式をコピー」「答えをコピー」、入力欄の長押し：「貼り付け」
 let hold=null, skipClick=false;
-function clearCopy(){
-  if(copying===null) return;
-  copying=null;
+function closeMenu(){
+  if(copying===null && !pasting) return;
+  copying=null; pasting=false;
   el.history.querySelector(".row.picked")?.classList.remove("picked");
   updateBars();
 }
+function showNote(msg){ el.parenInfo.textContent=msg; el.parenInfo.classList.add("warn"); }
 // 式の参照は数字に置き換え、カンマなしで
 const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
 function copyText(text){
-  const failed=()=>{ el.parenInfo.textContent="コピーできませんでした"; el.parenInfo.classList.add("warn"); };
+  const failed=()=>showNote("コピーできませんでした");
   const fallback=()=>{
     const ta=document.createElement("textarea");
     ta.value=text; ta.readOnly=true; ta.style.cssText="position:fixed;top:0;left:0;opacity:0;-webkit-user-select:text;user-select:text";
@@ -561,35 +565,68 @@ function copyText(text){
   else if(!fallback()) failed();
 }
 function copyRow(kind){
-  const h=byId(copying); clearCopy();
+  const h=byId(copying); closeMenu();
   if(!h) return;
   if(kind==="ans"){ if(isFinite(h.v)) copyText((h.v<0?"-":"")+plain(h.v)); }
   else copyText(exprForCopy(h.e));
 }
-// コピーのボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
+// 貼り付ける文字を、この電卓の式の形に整える。式として読めなければ null
+function cleanPaste(text){
+  let t=text.normalize("NFKC").replace(/[\s,¥円]/g,"");
+  if(t.includes("=")) t=t.slice(t.lastIndexOf("=")+1);   // 「式=答え」なら答えだけ
+  t=t.replace(/[*xX✕]/g,"×").replace(/\//g,"÷").replace(/[-‐‑–—―]/g,"−").replace(/^\+/,"");
+  if(!t || !/^[0-9.+−×÷()%]+$/.test(t)) return null;
+  if((t.match(/[0-9.]+/g)||[]).some(n=>n==="."||n.split(".").length>2)) return null;
+  let depth=0; for(const c of t){ depth += c==="(" ? 1 : c===")" ? -1 : 0; if(depth<0) return null; }
+  if(depth!==0) return null;
+  try{ evaluate(t); }catch(e){ if(e!=="0では割れません") return null; }
+  return t;
+}
+function pasteText(text){
+  const x=cleanPaste(text);
+  if(x===null){ showNote("貼り付けできない内容です"); return; }
+  done=false;
+  let b,a;
+  if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  // 式を途中に貼るときは、まとまりが崩れないよう括弧で囲む（数字1つや「10%」なら囲まない）
+  const ins = /^[0-9.]+%?$/.test(x) || (b==="" && a==="") ? x : "("+x+")";
+  const L=b.slice(-1), F=ins.charAt(0);
+  if(((L===")"||L==="]"||L==="%") && (isDigit(F)||F==="."||F==="(")) || ((isDigit(L)||L===".") && F==="(")) b+="×";
+  b+=ins; expr=b+joinRight(b,a)+a; pos=b.length;
+  render();
+}
+$("p-paste").addEventListener("click",()=>{
+  closeMenu();
+  if(!navigator.clipboard?.readText){ showNote("貼り付けできませんでした"); return; }
+  navigator.clipboard.readText().then(pasteText,()=>showNote("貼り付けできませんでした"));
+});
+// ボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
 document.addEventListener("pointerdown",()=>{ skipClick=false; },true);
 document.addEventListener("click",e=>{
   if(skipClick){ skipClick=false; e.stopPropagation(); e.preventDefault(); return; }   // 長押しした直後のクリックは無視する
-  if(copying!==null && !el.copyBar.contains(e.target)){ clearCopy(); e.stopPropagation(); e.preventDefault(); }
+  if((copying!==null||pasting) && !el.copyBar.contains(e.target) && !el.pasteBar.contains(e.target)){ closeMenu(); e.stopPropagation(); e.preventDefault(); }
 },true);
 $("c-expr").addEventListener("click",()=>copyRow("expr"));
 $("c-ans").addEventListener("click",()=>copyRow("ans"));
 const cancelHold = () => { if(hold){ clearTimeout(hold.timer); hold=null; } };
-el.history.addEventListener("pointerdown",e=>{
-  const row=e.target.closest(".row"); if(!row) return;
-  cancelHold();
-  hold={x:e.clientX, y:e.clientY, timer:setTimeout(()=>{
-    hold=null; clearCopy();
-    copying=+row.dataset.id; row.classList.add("picked");
-    $("c-ans").disabled=!isFinite(byId(copying)?.v);
-    skipClick=true; updateBars();
-  },500)};
+// 0.5秒動かさずに押し続けたら onHold を呼ぶ
+function watchHold(target, onHold){
+  target.addEventListener("pointerdown",e=>{
+    cancelHold();
+    const fire=onHold(e); if(!fire) return;
+    hold={x:e.clientX, y:e.clientY, timer:setTimeout(()=>{ hold=null; closeMenu(); fire(); skipClick=true; updateBars(); },500)};
+  });
+  target.addEventListener("pointermove",e=>{ if(hold && Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>10) cancelHold(); });
+  for(const ev of ["pointerup","pointercancel"]) target.addEventListener(ev,cancelHold);
+  target.addEventListener("scroll",cancelHold,{passive:true});
+  target.addEventListener("touchend",e=>{ if(skipClick) e.preventDefault(); });   // 長押しのあとはタップ扱いにしない
+  target.addEventListener("contextmenu",e=>e.preventDefault());   // Androidで長押ししたときのメニューを出さない
+}
+watchHold(el.history, e=>{
+  const row=e.target.closest(".row"); if(!row) return null;
+  return ()=>{ copying=+row.dataset.id; row.classList.add("picked"); $("c-ans").disabled=!isFinite(byId(copying)?.v); };
 });
-el.history.addEventListener("pointermove",e=>{ if(hold && Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>10) cancelHold(); });
-for(const ev of ["pointerup","pointercancel"]) el.history.addEventListener(ev,cancelHold);
-el.history.addEventListener("scroll",cancelHold,{passive:true});
-el.history.addEventListener("touchend",e=>{ if(skipClick) e.preventDefault(); });   // 長押しのあとはタップ扱いにしない
-el.history.addEventListener("contextmenu",e=>e.preventDefault());   // Androidで長押ししたときのメニューを出さない
+watchHold(el.expr, ()=>()=>{ pasting=true; });
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
 $("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });

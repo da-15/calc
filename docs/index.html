@@ -554,10 +554,11 @@ function closeMenu(){
   el.history.querySelector(".row.picked")?.classList.remove("picked");
   updateBars();
 }
-// エラーのメッセージ。次に画面のどこかを触るか、キーを押すと消える
+// エラーのメッセージ。次にどこかをタップするか、キーを押すと消える（タップした操作はそのまま行う）。
+// 指が触れた瞬間に画面を変えると、iPhoneはそのタップを取り消してしまうので、タップが確定した時点で消す
 function showNote(msg){ note=msg; updateInfo(); }
 function clearNote(){ if(note){ note=""; updateInfo(); } }
-document.addEventListener("pointerdown",clearNote,true);
+document.addEventListener("click",clearNote,true);
 document.addEventListener("keydown",clearNote,true);
 // 式の参照は数字に置き換え、カンマなしで
 const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });

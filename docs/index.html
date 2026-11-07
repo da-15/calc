@@ -58,7 +58,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}
 .ref{display:inline-block;line-height:1.3;background:var(--ref-bg);color:var(--accent);
   border:1px solid transparent;border-radius:.35em;padding:0 .3em}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}   /* Tabキーで移動したときの枠線。はみ出して切れないよう内側に描く */
 
 /* 式のラベルと編集中のボタン */
 .label{font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;height:30px}

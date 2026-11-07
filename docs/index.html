@@ -173,6 +173,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 const OPS = ["+","−","×","÷"];
 const LIMIT = 200;
 const STORE = "calc-history-v2";
+const DIV0 = "0では割れません。";
 let expr = "";          // 入力中の式
 let pos = 0;            // カーソル位置
 let sel = null;         // 選択中の数字 {a,b}
@@ -243,7 +244,7 @@ function evaluate(s){
       else if(typeof o==="number"||o==="(") o="×";   // 2(3) や (2)(3) は掛け算とみなす
       else break;
       const r=factor(); if(r.pct) pcts++;
-      if(o==="÷"&&r.v===0) throw "0では割れません。";
+      if(o==="÷"&&r.v===0) throw DIV0;
       v = o==="×" ? v*r.v : v/r.v;
     }
     return {v, pct:pcts===1}; }
@@ -270,9 +271,9 @@ function fmt(v){
   if(a>=1e16||(a!==0&&a<1e-9)) return sign+a.toExponential(6).replace("e+","e").replace(/\.?0+e/,"e");
   return sign+a.toLocaleString("en-US",{maximumSignificantDigits:15});
 }
-// 式に書ける形の数字（マイナスは括弧付き）
-// カンマなし・省略なしの数字（有効15桁）
+// カンマなし・省略なしの数字（有効15桁、符号なし）
 const plain = v => Math.abs(clean(v)).toLocaleString("en-US",{useGrouping:false,maximumSignificantDigits:15});
+// 式に書ける形の数字（マイナスは括弧付き）
 const numLit = v => v<0 ? "(−"+plain(v)+")" : plain(v);
 // 途中の式から、計算できる形を作る：末尾の演算子などを外し、閉じ括弧を補う
 function complete(s){
@@ -506,7 +507,7 @@ function render(){
   // 途中の式でも答えを先に見せる
   const s=complete(expr);
   let v=null; if(s){ try{ v=evaluate(s); }catch(e){ v=e; } }
-  if(v==="0では割れません。") showError(v);
+  if(v===DIV0) showError(v);
   else { el.result.className="result"; el.result.textContent = typeof v==="number" ? "="+fmt(v) : ""; }
 }
 
@@ -527,7 +528,7 @@ el.history.addEventListener("click",e=>{
 });
 // 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
 el.expr.addEventListener("click",e=>{
-  if(!el.modal.hidden||suppressClick) return;
+  if(!el.modal.hidden) return;
   closeMenu();
   if(keysHidden) setKeys(false);    // 隠れているときに式をタップしたらテンキーを戻す
   done=false;
@@ -590,7 +591,7 @@ function cleanPaste(text){
   if((t.match(/[0-9.]+/g)||[]).some(n=>n==="."||n.split(".").length>2)) return null;
   let depth=0; for(const c of t){ depth += c==="(" ? 1 : c===")" ? -1 : 0; if(depth<0) return null; }
   if(depth!==0) return null;
-  try{ evaluate(t); }catch(e){ if(e!=="0では割れません。") return null; }
+  try{ evaluate(t); }catch(e){ if(e!==DIV0) return null; }
   return t;
 }
 function pasteText(text){
@@ -638,7 +639,7 @@ $("p-paste").addEventListener("click",()=>{
 // ボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
 document.addEventListener("pointerdown",()=>{ skipClick=false; },true);
 document.addEventListener("click",e=>{
-  if(performance.now()<noClickUntil){ e.stopPropagation(); e.preventDefault(); return; }   // ピンチの直後のクリックは無視する
+  if(performance.now()<noClickUntil){ e.stopPropagation(); e.preventDefault(); return; }   // ドラッグやピンチの直後のクリックは無視する
   if(skipClick){ skipClick=false; e.stopPropagation(); e.preventDefault(); return; }   // 長押しした直後のクリックは無視する
   if((copying!==null||pasting) && !el.copyBar.contains(e.target) && !el.pasteBar.contains(e.target)){ closeMenu(); e.stopPropagation(); e.preventDefault(); }
 },true);
@@ -660,7 +661,8 @@ function watchHold(target, onHold){
 }
 watchHold(el.history, e=>{
   const row=e.target.closest(".row"); if(!row) return null;
-  return ()=>{ copying=+row.dataset.id; row.classList.add("picked"); $("c-ans").disabled=!isFinite(byId(copying)?.v); };
+  const id=+row.dataset.id;
+  return ()=>{ copying=id; el.history.querySelector(`.row[data-id="${id}"]`)?.classList.add("picked"); $("c-ans").disabled=!isFinite(byId(id)?.v); };
 });
 watchHold(el.expr, ()=>()=>{ pasting=true; });
 // クリックやタップでボタンにフォーカスを移さない。
@@ -669,16 +671,18 @@ watchHold(el.expr, ()=>()=>{ pasting=true; });
 document.addEventListener("mousedown",e=>{ if(e.target.closest("button,[tabindex]")) e.preventDefault(); });
 $("e-cancel").addEventListener("click",cancelEdit);
 $("e-del").addEventListener("click",deleteEditing);
-$("keys").addEventListener("click",e=>{ if(suppressClick) return; const b=e.target.closest("button"); if(b) press(b.dataset.k); });
+$("keys").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) press(b.dataset.k); });
 document.addEventListener("keydown",e=>{
   if(!el.modal.hidden){ if(e.key==="Escape") closeModal(); return; }
+  if(e.ctrlKey||e.metaKey||e.altKey) return;   // ブラウザのショートカット（拡大・再読み込み・コピーなど）はそのまま
+  if((e.key==="Enter"||e.key===" ") && e.target.closest?.("button,[tabindex]")) return;   // Tabで選んだボタンは、そのボタンを押す
   const map={"+":"+","-":"−","*":"×","/":"÷","%":"%","Enter":"=","=":"=","Backspace":"⌫","Escape":"C","(":"(",")":")",".":"."};
   const k = e.key.length===1&&isDigit(e.key) ? e.key : map[e.key];
   if(k){ e.preventDefault(); press(k); }
 });
 
 /* ---- テンキーを隠す・戻す ---- */
-let keysHidden=false, suppressClick=false, drag=null, keysH=0;
+let keysHidden=false, drag=null, keysH=0, noClickUntil=0;
 function setKeys(hide){
   if(hide && el.keysWrap.offsetHeight>0) keysH=el.keysWrap.offsetHeight;   // 出すときに使う高さを覚えておく
   keysHidden=hide;
@@ -686,7 +690,7 @@ function setKeys(hide){
   document.body.classList.toggle("keys-hidden",hide);
   el.grip.setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
 }
-function blockClick(){ suppressClick=true; setTimeout(()=>{ suppressClick=false; },350); }
+const blockClicks = ms => { noClickUntil=performance.now()+ms; };
 // テンキーを指に合わせて動かす。出ているときは下へ、隠れているときは上へ。
 // 離した位置と速さで、切り替えるか元に戻すかを決める
 function startDrag(e){
@@ -717,7 +721,7 @@ addEventListener("pointermove",e=>{
 function endDrag(e, cancel){
   const d=drag; drag=null;
   if(!d||!d.active) return;
-  blockClick();
+  blockClicks(350);
   const along=(e.clientY-d.y)*(d.show?-1:1);
   const toggle=!cancel && (along>d.H*0.35 || d.vy>0.5);
   const hide = d.show ? !toggle : toggle;
@@ -739,12 +743,12 @@ function endDrag(e, cancel){
 }
 addEventListener("pointerup",e=>endDrag(e,false));
 addEventListener("pointercancel",e=>endDrag(e,true));
-el.grip.addEventListener("click",()=>{ if(!suppressClick) setKeys(!keysHidden); });
+el.grip.addEventListener("click",()=>setKeys(!keysHidden));
 el.grip.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setKeys(!keysHidden); } });
 
 /* ---- ピンチで文字の大きさを変える ---- */
 const FS_MIN=14, FS_MAX=32, FS_KEY="calc-font-size";
-let fs=20, pinch=null, noClickUntil=0;
+let fs=20, pinch=null;
 try{ const v=parseFloat(localStorage.getItem(FS_KEY)); if(v>=FS_MIN&&v<=FS_MAX) fs=v; }catch(e){}
 document.documentElement.style.setProperty("--fs", fs+"px");
 const saveFs = () => { try{ localStorage.setItem(FS_KEY, String(fs)); }catch(e){} };
@@ -774,7 +778,7 @@ screenEl.addEventListener("touchmove",e=>{
 },{passive:false});
 for(const ev of ["touchend","touchcancel"]) screenEl.addEventListener(ev,e=>{
   if(!pinch || e.touches.length>=2) return;
-  pinch=null; saveFs(); noClickUntil=performance.now()+400;
+  pinch=null; saveFs(); blockClicks(400);
 });
 // iPhoneのSafari独自のピンチ（画面全体の拡大）を止める
 for(const ev of ["gesturestart","gesturechange"]) document.addEventListener(ev,e=>e.preventDefault());

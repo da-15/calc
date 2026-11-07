@@ -216,9 +216,9 @@ function tokenize(s){
   while(i<s.length){
     const c=s[i];
     if(isDigit(c)||c==="."){ let j=i; while(j<s.length&&(isDigit(s[j])||s[j]===".")) j++;
-      const n=s.slice(i,j); if(n===".") throw "式が途中です"; t.push(parseFloat(n)); i=j; }
+      const n=s.slice(i,j); if(n===".") throw "式が途中です。"; t.push(parseFloat(n)); i=j; }
     else if(c==="["){ const j=s.indexOf("]",i); const h=byId(+s.slice(i+1,j));
-      if(!h) throw "参照先がありません"; if(!isFinite(h.v)) throw "参照先がエラーです";
+      if(!h) throw "参照先がありません。"; if(!isFinite(h.v)) throw "参照先がエラーです。";
       t.push(h.v); i=j+1; }
     else { t.push(c); i++; }
   }
@@ -226,7 +226,7 @@ function tokenize(s){
 }
 function evaluate(s){
   const t=tokenize(s); let p=0;
-  const expect=()=>{ if(p>=t.length) throw "式が途中です"; };
+  const expect=()=>{ if(p>=t.length) throw "式が途中です。"; };
   // 足し算・引き算の右側が「10%」だけなら、左側の10%を足し引きする（200+10% = 220）
   function sum(){ let v=term().v;
     while(t[p]==="+"||t[p]==="−"){ const o=t[p++]; const r=term();
@@ -241,7 +241,7 @@ function evaluate(s){
       else if(typeof o==="number"||o==="(") o="×";   // 2(3) や (2)(3) は掛け算とみなす
       else break;
       const r=factor(); if(r.pct) pcts++;
-      if(o==="÷"&&r.v===0) throw "0では割れません";
+      if(o==="÷"&&r.v===0) throw "0では割れません。";
       v = o==="×" ? v*r.v : v/r.v;
     }
     return {v, pct:pcts===1}; }
@@ -249,9 +249,9 @@ function evaluate(s){
   function unary(){ expect(); if(t[p]==="−"){ p++; return -unary(); } return atom(); }
   function atom(){ expect(); const x=t[p++];
     if(typeof x==="number") return x;
-    if(x==="("){ const v=sum(); if(t[p]!==")") throw "式が途中です"; p++; return v; }
-    throw "式が途中です"; }
-  const v=sum(); if(p!==t.length) throw "式が途中です";
+    if(x==="("){ const v=sum(); if(t[p]!==")") throw "式が途中です。"; p++; return v; }
+    throw "式が途中です。"; }
+  const v=sum(); if(p!==t.length) throw "式が途中です。";
   return v;
 }
 // 2進数の誤差を消すため、足し算・引き算の答えを元の数の桁で丸める（有効15桁）
@@ -403,7 +403,7 @@ function equals(){
   const s=complete(expr);
   if(!s) return;
   let v; try{ v=evaluate(s); }catch(e){ showError(e); return; }
-  if(!isFinite(v)){ showError("桁が大きすぎます"); return; }
+  if(!isFinite(v)){ showError("桁が大きすぎます。"); return; }
   let id;
   if(editing!==null){
     const h=byId(editing); h.e=s; id=h.id; editing=null;
@@ -500,7 +500,7 @@ function render(){
   // 途中の式でも答えを先に見せる
   const s=complete(expr);
   let v=null; if(s){ try{ v=evaluate(s); }catch(e){ v=e; } }
-  if(v==="0では割れません") showError(v);
+  if(v==="0では割れません。") showError(v);
   else { el.result.className="result"; el.result.textContent = typeof v==="number" ? "="+fmt(v) : ""; }
 }
 
@@ -553,7 +553,7 @@ function showNote(msg){ el.parenInfo.textContent=msg; el.parenInfo.classList.add
 // 式の参照は数字に置き換え、カンマなしで
 const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
 function copyText(text){
-  const failed=()=>showNote("コピーできませんでした");
+  const failed=()=>showNote("コピーできませんでした。");
   const fallback=()=>{
     const ta=document.createElement("textarea");
     ta.value=text; ta.readOnly=true; ta.style.cssText="position:fixed;top:0;left:0;opacity:0;-webkit-user-select:text;user-select:text";
@@ -579,12 +579,12 @@ function cleanPaste(text){
   if((t.match(/[0-9.]+/g)||[]).some(n=>n==="."||n.split(".").length>2)) return null;
   let depth=0; for(const c of t){ depth += c==="(" ? 1 : c===")" ? -1 : 0; if(depth<0) return null; }
   if(depth!==0) return null;
-  try{ evaluate(t); }catch(e){ if(e!=="0では割れません") return null; }
+  try{ evaluate(t); }catch(e){ if(e!=="0では割れません。") return null; }
   return t;
 }
 function pasteText(text){
   const x=cleanPaste(text);
-  if(x===null){ showNote("貼り付けできない内容です"); return; }
+  if(x===null){ showNote("貼り付けできない内容です。"); return; }
   done=false;
   let b,a;
   if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
@@ -595,10 +595,16 @@ function pasteText(text){
   b+=ins; expr=b+joinRight(b,a)+a; pos=b.length;
   render();
 }
+// パソコンでは Ctrl+V（Macは⌘+V）でも貼り付けられる。キーボードでの貼り付けは確認なしで読める
+document.addEventListener("paste",e=>{
+  if(!el.modal.hidden) return;
+  const t=e.clipboardData?.getData("text/plain"); if(t==null) return;
+  e.preventDefault(); closeMenu(); pasteText(t);
+});
 $("p-paste").addEventListener("click",()=>{
   closeMenu();
-  if(!navigator.clipboard?.readText){ showNote("貼り付けできませんでした"); return; }
-  navigator.clipboard.readText().then(pasteText,()=>showNote("貼り付けできませんでした"));
+  if(!navigator.clipboard?.readText){ showNote("貼り付けできませんでした。"); return; }
+  navigator.clipboard.readText().then(pasteText,()=>showNote("貼り付けできませんでした。"));
 });
 // ボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
 document.addEventListener("pointerdown",()=>{ skipClick=false; },true);

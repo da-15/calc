@@ -2,7 +2,7 @@
 /* 画面構成：上に履歴、その下に入力中の式、いちばん下に5×5のテンキー */
 :root{
   --bg:#eef0f2; --panel:#ffffff; --key:#ffffff; --key-op:#e3e9ee; --fg:#1d2730; --muted:#6c7a86;
-  --accent:#0f6e74; --accent-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
+  --accent:#0f6e74; --accent-fg:#ffffff; --warm:#c46b1c; --warm-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
   --fs:20px;   /* 履歴と入力欄の文字の大きさ（ピンチで変える） */
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,"Noto Sans JP",sans-serif;
@@ -12,7 +12,7 @@
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
-  --accent:#2fa7ac; --accent-fg:#06191a; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
+  --accent:#2fa7ac; --accent-fg:#06191a; --warm:#e78e40; --warm-fg:#1f1206; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
 /* ページ全体はスクロールさせない。上下の余白は、上を表示部分、下をテンキーの帯の色で塗る */
@@ -92,6 +92,8 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .keys [data-k="+"]{grid-row:span 2;height:auto}   /* ＋は2段ぶんの縦長（4・1の段の右） */
 .keys .small{font-size:19px}
 .keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
+/* AC はオレンジ。＝のティールと同じ明るさ・鮮やかさにそろえた、補色寄りの色 */
+.keys .ac{background:var(--warm);border-color:var(--warm);color:var(--warm-fg)}
 .keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}
 .keys svg{width:26px;height:26px;display:block;margin:auto}
 @media (prefers-reduced-motion:reduce){.expr .cur,.history .row.changed .ans{animation:none}.keys-wrap{transition:none}}

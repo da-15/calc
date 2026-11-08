@@ -164,6 +164,12 @@ test("入力欄の記号をタップして選ぶ", async () => {
   await start("(−5)×2");
   await sym("−").tap(); await t.key("+");
   assert.equal(await t.expr(), "(−5)×2");            // 符号の−は演算子に置き換えない
+  await sym("−").tap(); await t.key("±");
+  assert.equal(await t.expr(), "(−5)×2");            // 符号の−を選んで±を押しても何もしない
+  await start("1+2");
+  await sym("+").tap(); await t.key("±");
+  assert.equal(await t.expr(), "1+(−2");             // ほかの記号なら、その直後で符号を扱う
+  await start("(−5)×2");
   await sym("×").tap(); await sym("×").tap();
   assert.equal(await t.page.evaluate("sel===null && pos===5"), true);   // もう一度タップでその直後にカーソル
   await t.close();

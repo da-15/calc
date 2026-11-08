@@ -96,6 +96,8 @@ function pushRow(e,v){
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
 // 選んでいるのが記号（演算子・括弧・%）か。数字と参照のときは false
 const selIsSym = () => sel!==null && !/[0-9.[]/.test(expr[sel.a]);
+// 位置 i の「−」が、引き算ではなく符号か（式の先頭や「(」の直後）
+const isSignAt = i => expr[i]==="−" && (i===0 || expr[i-1]==="(");
 function press(k){
   closeMenu();
   if(!el.modal.hidden) return;
@@ -109,7 +111,10 @@ function press(k){
     done=false;
   }
   if(k==="±"){
-    if(selIsSym()){ pos=sel.b; sel=null; }   // 記号を選んでいるときは、その直後で符号を扱う
+    if(selIsSym()){
+      if(isSignAt(sel.a)) return render();   // 符号の−を選んでいるときは何もしない
+      pos=sel.b; sel=null;                   // ほかの記号を選んでいるときは、その直後で符号を扱う
+    }
     toggleSign(); return render();
   }
   let b, a;
@@ -117,8 +122,7 @@ function press(k){
     // 選んだものは⌫で丸ごと消える。数字は数字キーで、演算子は演算子キーで置き換わる。
     // それ以外のキーは、選んだものの直後に入る。符号としての−（先頭や「(」の直後）は演算子に置き換えない
     const c=expr[sel.a], sym=selIsSym();
-    const unary = c==="−" && (sel.a===0 || expr[sel.a-1]==="(");
-    const replace = k==="⌫" || (sym ? OPS.includes(c) && OPS.includes(k) && !unary : isDigit(k)||k===".");
+    const replace = k==="⌫" || (sym ? OPS.includes(c) && OPS.includes(k) && !isSignAt(sel.a) : isDigit(k)||k===".");
     b=expr.slice(0, replace ? sel.a : sel.b); a=expr.slice(sel.b); sel=null;
     if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
   } else { b=expr.slice(0,pos); a=expr.slice(pos); }

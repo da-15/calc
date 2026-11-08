@@ -144,6 +144,50 @@ const Calc = (() => {
     return "";
   }
 
+  /* ---- 符号の切り替え（±） ---- */
+  // 「ひとまとまり」は、数字・参照・括弧で囲まれた部分のどれか。
+  // 位置 i から始まるひとまとまりの終わりの位置を返す。i からまとまりが始まらなければ -1
+  function operandEnd(s,i){
+    const c=s[i];
+    if(isDigit(c)||c==="."){ while(i<s.length&&(isDigit(s[i])||s[i]===".")) i++; return i; }
+    if(c==="[") return s.indexOf("]",i)+1;
+    if(c==="("){ let d=0; for(;i<s.length;i++){ if(s[i]==="(") d++; else if(s[i]===")" && --d===0) return i+1; } }
+    return -1;
+  }
+  // カーソル q の直前のひとまとまり（数字なら q を含むもの）を {a,b} で返す。直後の%は飛ばす。なければ null
+  function operandBefore(s,q){
+    if(s[q-1]==="%") q--;
+    const t=exprTokens(s).find(t=>(t.k==="num"||t.k==="ref") && t.a<q && q<=t.b);
+    if(t) return {a:t.a, b:t.b};
+    if(s[q-1]===")"){ let d=0; for(let i=q-1;i>=0;i--){ if(s[i]===")") d++; else if(s[i]==="(" && --d===0) return {a:i, b:q}; } }
+    return null;
+  }
+  // 式 s の、選んだまとまり sel（なければカーソル pos の直前のまとまり）の符号を切り替える。
+  // 戻り値 {s, pos, sel}。まとまりがなければ、マイナスの数を打ち始める形にする
+  function toggleSign(s,pos,sel=null){
+    const R = sel || operandBefore(s,pos);
+    if(!R){
+      const b=s.slice(0,pos), a=s.slice(pos), L=b.slice(-1);
+      if(b===""||L==="(") return {s:b+"−"+a, pos:b.length+1, sel:null};
+      if(OPS.includes(L)) return {s:b+"(−"+a, pos:b.length+2, sel:null};
+      return {s, pos, sel};
+    }
+    const X=s.slice(R.a,R.b), pre=s.slice(0,R.a), post=s.slice(R.b);
+    const inner=X.slice(2,-1), e=operandEnd(inner,0);
+    const single = e===inner.length || (e>0 && inner[e]==="%" && e+1===inner.length);   // 中身がひとまとまりだけか
+    // 式の [ra,rb) を N に置き換える。xAt は、N の中で X が始まる位置
+    let ra=R.a, rb=R.b, N=X, xAt=0;
+    if(X.startsWith("(−") && X.endsWith(")") && single) N=inner;                         // 「(−5)」「(−(3+5))」→ 外す
+    else if(pre.endsWith("(−") && post.startsWith(")")){ ra-=2; rb+=1; }                 // 「(−5)」の5 → 外す
+    else if(pre.endsWith("−") && (pre.length===1 || pre.slice(-2,-1)==="(")) ra-=1;       // 「−5」→ 外す
+    else if(pre===""||pre.endsWith("(")){ N="−"+X; xAt=1; }                               // 先頭や「(」の直後 →「−5」
+    else { N="(−"+X+")"; xAt=2; }                                                         // 式の途中 →「(−5)」
+    const out=s.slice(0,ra)+N+s.slice(rb);
+    if(sel) return {s:out, pos:ra+xAt+X.length, sel:{a:ra+xAt, b:ra+xAt+X.length}};
+    // カーソルは、置き換えた部分より後ろならずらす。中なら同じまとまりの中の位置を保つ
+    return {s:out, pos: pos>=rb ? pos+out.length-s.length : ra+xAt+(pos-R.a), sel:null};
+  }
+
   // 貼り付ける文字を、この電卓の式の形に整える。式として読めなければ null
   function cleanPaste(text){
     let t=text.normalize("NFKC").replace(/[\s,¥円]/g,"");
@@ -157,6 +201,6 @@ const Calc = (() => {
     return t;
   }
 
-  return { OPS, DIV0, isDigit, endsOperand, opens, evaluate, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, cleanPaste };
+  return { OPS, DIV0, isDigit, endsOperand, opens, evaluate, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, operandEnd, operandBefore, toggleSign, cleanPaste };
 })();
 if(typeof module==="object" && module.exports) module.exports = Calc;

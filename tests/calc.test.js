@@ -104,6 +104,26 @@ test("入力ルール", () => {
   assert.equal(Calc.joinRight("5", "+1"), "");
 });
 
+test("±：数字・参照・括弧のまとまりの符号を切り替える", () => {
+  const sign = (s, pos = s.length, sel = null) => Calc.toggleSign(s, pos, sel).s;
+  assert.equal(sign("5"), "−5");
+  assert.equal(sign("−5"), "5");
+  assert.equal(sign("12×5"), "12×(−5)");             // 式の途中は括弧で囲む
+  assert.equal(sign("12×(−5)"), "12×5");             // もう一度で外す
+  assert.equal(sign("12×[3]"), "12×(−[3])");
+  assert.equal(sign("12×(3+5)"), "12×(−(3+5))");     // 括弧のまとまりも1つとして扱う
+  assert.equal(sign("12×(−(3+5))"), "12×(3+5)");
+  assert.equal(sign("(3+5)"), "−(3+5)");
+  assert.equal(sign("−(3+5)"), "(3+5)");
+  assert.equal(sign("12×"), "12×(−");                // まとまりがなければ、マイナスの数を打ち始める
+  assert.equal(sign(""), "−");
+  assert.equal(sign("12×5+1", 4), "12×(−5)+1");      // カーソルの直前のまとまり
+  assert.equal(sign("12×5", 4, { a: 3, b: 4 }), "12×(−5)");   // 選んだ数字
+  assert.deepEqual(Calc.toggleSign("12×5", 4, { a: 3, b: 4 }).sel, { a: 5, b: 6 });   // 選んだまま
+  assert.equal(Calc.operandEnd("12×(3+5)", 3), 8);
+  assert.equal(Calc.operandEnd("12×5", 2), -1);
+});
+
 test("式をまとまりに分ける", () => {
   assert.deepEqual(Calc.exprTokens("12+[3]").map(t => t.k), ["num", "sym", "ref"]);
   assert.deepEqual(Calc.exprTokens("12+[3]").map(t => [t.a, t.b]), [[0, 2], [2, 3], [3, 6]]);

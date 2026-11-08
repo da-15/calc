@@ -113,7 +113,9 @@ function press(k){
   if(k==="±"){
     if(selIsSym()){
       if(isSignAt(sel.a)) return render();   // 符号の−を選んでいるときは何もしない
-      pos=sel.b; sel=null;                   // ほかの記号を選んでいるときは、その直後で符号を扱う
+      // ほかの記号を選んでいるときは、直後のまとまりの符号を切り替える（12×5 の×なら 12×(−5)）
+      const e=Calc.operandEnd(expr, sel.b);
+      pos = e>0 ? e : sel.b; sel=null;
     }
     toggleSign(); return render();
   }
@@ -131,29 +133,8 @@ function press(k){
   if(nb!==null){ expr=nb+(k==="⌫"?"":joinRight(nb,a))+a; pos=nb.length; }
   render();
 }
-// ± ：カーソルのある数字（または選択中の数字）の符号を切り替える
-function toggleSign(){
-  let q=pos;
-  if(!sel && expr[q-1]===")" && /\(−([0-9.]+|\[\d+\])%?\)$/.test(expr.slice(0,q))) q--;   // (−5) の直後
-  if(!sel && expr[q-1]==="%") q--;
-  const tk = sel || exprTokens(expr).find(t=>(t.k==="num"||t.k==="ref") && t.a<q && q<=t.b);
-  if(!tk){
-    // 数字を打つ前なら、マイナスの数を打ち始める
-    const b=expr.slice(0,pos), a=expr.slice(pos), L=b.slice(-1);
-    if(b===""||L==="("){ expr=b+"−"+a; pos=b.length+1; }
-    else if(OPS.includes(L)){ expr=b+"(−"+a; pos=b.length+2; }
-    return;
-  }
-  const X=expr.slice(tk.a,tk.b), pre=expr.slice(0,tk.a), post=expr.slice(tk.b);
-  let na, wrapped=false;
-  if(pre.endsWith("(−") && post.startsWith(")")){ expr=pre.slice(0,-2)+X+post.slice(1); na=tk.a-2; }
-  else if(pre.endsWith("−") && (pre.length===1 || pre.slice(-2,-1)==="(")){ expr=pre.slice(0,-1)+X+post; na=tk.a-1; }
-  else if(pre===""||pre.endsWith("(")){ expr=pre+"−"+X+post; na=tk.a+1; }
-  else { expr=pre+"(−"+X+")"+post; na=tk.a+2; wrapped=true; }
-  const end=na+X.length;
-  if(sel){ sel={a:na,b:end}; pos=end; }
-  else pos = end + (wrapped?1:0) + (expr[end+(wrapped?1:0)]==="%" && q<pos ? 1 : 0);
-}
+// ± ：選んでいる数字（なければカーソルの直前のまとまり）の符号を切り替える
+function toggleSign(){ ({s:expr, pos, sel}=Calc.toggleSign(expr, pos, sel)); }
 function equals(){
   sel=null;
   const s=complete(expr);

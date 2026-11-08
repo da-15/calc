@@ -52,7 +52,7 @@ async function open({ width = 390, height = 760 } = {}) {
     calc: async s => { await t.type(s); await t.key("="); },
     expr: () => page.evaluate("expr"),
     result: () => page.locator("#result").innerText(),
-    info: () => page.locator("#parenInfo").innerText(),
+    info: () => page.locator("#info").innerText(),
     shown: id => page.evaluate(id => !document.getElementById(id).hidden, id),
     row: i => page.locator("#history .row").nth(i),
     rows: () => page.locator("#history .row").count(),

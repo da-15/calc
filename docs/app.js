@@ -14,13 +14,11 @@ const CONFIG = {
   DRAG_TOGGLE: 0.35,        // テンキーの高さのこの割合以上動かして離したら、出す・隠すを切り替える
   DRAG_FLICK: 0.5,          // これより速く払ったら（px/ミリ秒）、動かした量にかかわらず切り替える
   DRAG_ANIM_MS: 200,        // 指を離したあとの、テンキーが動き切るまでの時間
-  BLOCK_AFTER_DRAG: 350,    // テンキーのドラッグ直後、タップを無視する時間
-  BLOCK_AFTER_PINCH: 400,   // ピンチ直後、タップを無視する時間
 };
 // 端末に保存するときの名前
 const STORE = "calc-history-v2", FS_KEY = "calc-font-size";
 
-const { OPS, isDigit, endsOperand, opens, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, cleanPaste } = Calc;
+const { OPS, isDigit, opens, complete, fmt, plain, numLit, exprTokens, applyKey, joinRight, cleanPaste } = Calc;
 let expr = "";          // 入力中の式
 let pos = 0;            // カーソル位置
 let sel = null;         // 選択中の数字 {a,b}
@@ -38,7 +36,7 @@ const flash = new Set();   // 再計算で答えが変わった行
 
 const $ = id => document.getElementById(id);
 const el = { history:$("history"), expr:$("expr"), exprText:$("exprText"), result:$("result"), label:$("exprLabel"),
-  parenInfo:$("parenInfo"), editBar:$("editBar"), copyBar:$("copyBar"), pasteBar:$("pasteBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
+  info:$("info"), editBar:$("editBar"), copyBar:$("copyBar"), pasteBar:$("pasteBar"), modal:$("modal"), keyarea:$("keyarea"), keysWrap:$("keysWrap"), grip:$("grip") };
 const byId = id => history.find(h=>h.id===id);
 const idxOf = id => history.findIndex(h=>h.id===id);
 
@@ -53,8 +51,6 @@ function load(){
     }
   }catch(e){}
   recalc(false);
-  // 上限を超えていたら古い行から消す（参照している式は数字に置き換える）
-  if(history.length>CONFIG.LIMIT){ while(history.length>CONFIG.LIMIT) removeRow(history[0].id); save(); }
 }
 
 /* ---- 計算：参照 [行ID] を履歴の答えに置き換えて計算する ---- */
@@ -94,6 +90,20 @@ function pushRow(e,v){
 
 /* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
+// 式をカーソルの前後 [b, a] に分ける。選択中なら選択を外し、replace なら選んだものを消す（そうでなければ、その直後で分ける）
+function cutAt(replace){
+  if(!sel) return [expr.slice(0,pos), expr.slice(pos)];
+  const r=[expr.slice(0, replace ? sel.a : sel.b), expr.slice(sel.b)]; sel=null; return r;
+}
+// カーソルの位置（選んでいる数字・参照なら置き換え、記号ならその直後）に x を入れる。
+// 前後が記号なしでつながるところには joiner を補う。キー入力と同じく、ふだんは×。答えの参照だけは+（答えを足していく使い方が多いため）
+function insertAt(x, joiner){
+  done=false;
+  let [b,a]=cutAt(!selIsSym());
+  if(joinRight(b,x)) b=(b.endsWith(".") ? b.slice(0,-1) : b)+joiner;
+  b+=x; expr=b+(joinRight(b,a) ? joiner : "")+a; pos=b.length;
+  render();
+}
 // 選んでいるのが記号（演算子・括弧・%）か。数字と参照のときは false
 const selIsSym = () => sel!==null && !/[0-9.[]/.test(expr[sel.a]);
 // 位置 i の「−」が、引き算ではなく符号か（式の先頭や「(」の直後）
@@ -119,15 +129,12 @@ function press(k){
     }
     toggleSign(); return render();
   }
-  let b, a;
-  if(sel){
-    // 選んだものは⌫で丸ごと消える。数字は数字キーで、演算子は演算子キーで置き換わる。
-    // それ以外のキーは、選んだものの直後に入る。符号としての−（先頭や「(」の直後）は演算子に置き換えない
-    const c=expr[sel.a], sym=selIsSym();
-    const replace = k==="⌫" || (sym ? OPS.includes(c) && OPS.includes(k) && !isSignAt(sel.a) : isDigit(k)||k===".");
-    b=expr.slice(0, replace ? sel.a : sel.b); a=expr.slice(sel.b); sel=null;
-    if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
-  } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  // 選んだものは⌫で丸ごと消える。数字は数字キーで、演算子は演算子キーで置き換わる。
+  // それ以外のキーは、選んだものの直後に入る。符号としての−（先頭や「(」の直後）は演算子に置き換えない
+  const hadSel = sel!==null;
+  const replace = k==="⌫" || (selIsSym() ? OPS.includes(expr[sel.a]) && OPS.includes(k) && !isSignAt(sel.a) : isDigit(k)||k===".");
+  const [b,a]=cutAt(replace);
+  if(hadSel && k==="⌫"){ expr=b+a; pos=b.length; return render(); }
   // 00 は 0 を2回打ったのと同じ
   const nb = k==="00" ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
   if(nb!==null){ expr=nb+(k==="⌫"?"":joinRight(nb,a))+a; pos=nb.length; }
@@ -162,16 +169,7 @@ function deleteEditing(){
   setExpr(""); done=false; render();
 }
 // 過去の答えを参照として式に入れる（編集中は、その行より上の答えだけ）
-function insertRef(id){
-  closeMenu();
-  done=false;
-  let b,a;
-  if(sel){ b=expr.slice(0, selIsSym() ? sel.b : sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
-  // 前後に記号がなければ「+」でつなぐ（答えを足していく使い方が多いため）
-  const L=b.slice(-1);
-  if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"+";
-  b+="["+id+"]"; expr=b+(joinRight(b,a)?"+":"")+a; pos=b.length; render();
-}
+function insertRef(id){ closeMenu(); insertAt("["+id+"]", "+"); }
 
 /* ---- 表示 ---- */
 const esc = s => s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
@@ -214,12 +212,12 @@ function updateBars(){
   el.copyBar.hidden = copying===null;
   el.pasteBar.hidden = !pasting;
   el.editBar.hidden = editing===null || menu || note!=="";
-  el.parenInfo.hidden = menu;
+  el.info.hidden = menu;
 }
 function updateInfo(){
   const full = editing===null && expr!=="" && history.length>=CONFIG.LIMIT;
-  el.parenInfo.textContent = note || (full ? `上限${CONFIG.LIMIT}件です。確定すると最古の行が消えます。` : "");
-  el.parenInfo.classList.toggle("warn", note!=="" || full);
+  el.info.textContent = note || (full ? `上限${CONFIG.LIMIT}件です。確定すると最古の行が消えます。` : "");
+  el.info.classList.toggle("warn", note!=="" || full);
   updateBars();
 }
 function render(){
@@ -289,15 +287,8 @@ document.addEventListener("keydown",clearNote,true);
 const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
 function copyText(text){
   const failed=()=>showNote("コピーできませんでした。");
-  const fallback=()=>{
-    const ta=document.createElement("textarea");
-    ta.value=text; ta.readOnly=true; ta.style.cssText="position:fixed;top:0;left:0;opacity:0;-webkit-user-select:text;user-select:text";
-    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,text.length);
-    let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
-    ta.remove(); return ok;
-  };
-  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(()=>{ if(!fallback()) failed(); });
-  else if(!fallback()) failed();
+  if(!navigator.clipboard?.writeText) return failed();
+  navigator.clipboard.writeText(text).catch(failed);
 }
 function copyRow(kind){
   const h=byId(copying); closeMenu();
@@ -308,15 +299,10 @@ function copyRow(kind){
 function pasteText(text){
   const x=cleanPaste(text);
   if(x===null){ showNote("貼り付けできない内容です。"); return; }
-  done=false;
-  let b,a;
-  if(sel){ b=expr.slice(0, selIsSym() ? sel.b : sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
-  // 式を途中に貼るときは、まとまりが崩れないよう括弧で囲む（数字1つや「10%」なら囲まない）
-  const ins = /^[0-9.]+%?$/.test(x) || (b==="" && a==="") ? x : "("+x+")";
-  const L=b.slice(-1), F=ins.charAt(0);
-  if(((L===")"||L==="]"||L==="%") && (isDigit(F)||F==="."||F==="(")) || ((isDigit(L)||L===".") && F==="(")) b+="×";
-  b+=ins; expr=b+joinRight(b,a)+a; pos=b.length;
-  render();
+  // 式を途中に貼るときは、まとまりが崩れないよう括弧で囲む。
+  // 貼った後に式がそれだけになるとき（入力欄が空、または式全体を選んでいる）と、数字1つや「10%」なら囲まない
+  const whole = expr==="" || (sel && !selIsSym() && sel.a===0 && sel.b===expr.length);
+  insertAt(/^[0-9.]+%?$/.test(x) || whole ? x : "("+x+")", "×");
 }
 // パソコンでは Ctrl+C（Macは⌘+C）で、入力欄で選んでいる数字、なければ入力中の式と答えをコピーする（入力欄が空なら何もしない）
 document.addEventListener("copy",e=>{
@@ -347,11 +333,11 @@ $("p-paste").addEventListener("click",()=>{
   if(!navigator.clipboard?.readText){ showNote("貼り付けできませんでした。"); return; }
   navigator.clipboard.readText().then(pasteText,()=>showNote("貼り付けできませんでした。"));
 });
+// 長押し・テンキーのドラッグ・ピンチのあとは、次に指が触れるまでのクリックを無視する（skipClick）。
 // ボタンが出ている間は、ボタン以外のどこをタップしても閉じるだけにする（タップした場所の操作はしない）
 document.addEventListener("pointerdown",()=>{ skipClick=false; },true);
 document.addEventListener("click",e=>{
-  if(performance.now()<noClickUntil){ e.stopPropagation(); e.preventDefault(); return; }   // ドラッグやピンチの直後のクリックは無視する
-  if(skipClick){ skipClick=false; e.stopPropagation(); e.preventDefault(); return; }   // 長押しした直後のクリックは無視する
+  if(skipClick){ skipClick=false; e.stopPropagation(); e.preventDefault(); return; }
   if((copying!==null||pasting) && !el.copyBar.contains(e.target) && !el.pasteBar.contains(e.target)){ closeMenu(); e.stopPropagation(); e.preventDefault(); }
 },true);
 $("c-expr").addEventListener("click",()=>copyRow("expr"));
@@ -393,7 +379,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---- テンキーを隠す・戻す ---- */
-let keysHidden=false, drag=null, keysH=0, noClickUntil=0;
+let keysHidden=false, drag=null, keysH=0;
 function setKeys(hide){
   if(hide && el.keysWrap.offsetHeight>0) keysH=el.keysWrap.offsetHeight;   // 出すときに使う高さを覚えておく
   keysHidden=hide;
@@ -401,7 +387,6 @@ function setKeys(hide){
   document.body.classList.toggle("keys-hidden",hide);
   el.grip.setAttribute("aria-label", hide ? "テンキーを出す" : "テンキーを隠す");
 }
-const blockClicks = ms => { noClickUntil=performance.now()+ms; };
 // テンキーを指に合わせて動かす。出ているときは下へ、隠れているときは上へ。
 // 離した位置と速さで、切り替えるか元に戻すかを決める
 function startDrag(e){
@@ -432,7 +417,7 @@ addEventListener("pointermove",e=>{
 function endDrag(e, cancel){
   const d=drag; drag=null;
   if(!d||!d.active) return;
-  blockClicks(CONFIG.BLOCK_AFTER_DRAG);
+  skipClick=true;
   const along=(e.clientY-d.y)*(d.show?-1:1);
   const toggle=!cancel && (along>d.H*CONFIG.DRAG_TOGGLE || d.vy>CONFIG.DRAG_FLICK);
   const hide = d.show ? !toggle : toggle;
@@ -488,7 +473,7 @@ screenEl.addEventListener("touchmove",e=>{
 },{passive:false});
 for(const ev of ["touchend","touchcancel"]) screenEl.addEventListener(ev,e=>{
   if(!pinch || e.touches.length>=2) return;
-  pinch=null; saveFs(); blockClicks(CONFIG.BLOCK_AFTER_PINCH);
+  pinch=null; saveFs(); skipClick=true;
 });
 // iPhoneのSafari独自のピンチ（画面全体の拡大）を止める
 for(const ev of ["gesturestart","gesturechange"]) document.addEventListener(ev,e=>e.preventDefault());

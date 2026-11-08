@@ -203,6 +203,6 @@ const Calc = (() => {
     return t;
   }
 
-  return { OPS, DIV0, isDigit, endsOperand, opens, evaluate, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, operandEnd, operandBefore, toggleSign, cleanPaste };
+  return { OPS, DIV0, isDigit, opens, evaluate, complete, fmt, plain, numLit, exprTokens, applyKey, joinRight, operandEnd, operandBefore, toggleSign, cleanPaste };
 })();
 if(typeof module==="object" && module.exports) module.exports = Calc;

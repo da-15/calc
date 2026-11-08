@@ -216,7 +216,7 @@ function updateBars(){
 }
 function updateInfo(){
   const full = editing===null && expr!=="" && history.length>=CONFIG.LIMIT;
-  el.info.textContent = note || (full ? `上限${CONFIG.LIMIT}件です。確定すると最古の行が消えます。` : "");
+  el.info.textContent = note || (full ? "履歴上限です。最古の行が消えます。" : "");
   el.info.classList.toggle("warn", note!=="" || full);
   updateBars();
 }

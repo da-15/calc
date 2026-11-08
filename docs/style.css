@@ -67,7 +67,8 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 /* 参照の札を選んだときは、札そのものに枠を付けて背景と枠をぴったり重ねる */
 .expr .tok.sel.k-ref{background:none;outline:none}
 .expr .tok.sel .ref{outline:2px solid var(--accent);outline-offset:-1px}
-.expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin:0 -3px 0 1px;animation:blink 1s steps(1) infinite}
+.expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin:0 -3px 0 1px;animation:blink 1s steps(1) infinite;
+  position:relative;z-index:1}   /* 幅を取らずに隣に重ねて描くので、参照の札の背景に隠れないよう手前に出す */
 @keyframes blink{50%{opacity:0}}
 .result{font-weight:500;color:var(--muted)}
 

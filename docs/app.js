@@ -128,8 +128,8 @@ function press(k){
     b=expr.slice(0, replace ? sel.a : sel.b); a=expr.slice(sel.b); sel=null;
     if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
   } else { b=expr.slice(0,pos); a=expr.slice(pos); }
-  // 00 は 0 を2回打ったのと同じ
-  const nb = k==="00" ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
+  // 00・000 は 0 を続けて打ったのと同じ
+  const nb = k==="00"||k==="000" ? [...k].reduce((acc,c)=> acc===null ? null : applyKey(acc,a,c), b) : applyKey(b,a,k);
   if(nb!==null){ expr=nb+(k==="⌫"?"":joinRight(nb,a))+a; pos=nb.length; }
   render();
 }

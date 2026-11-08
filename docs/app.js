@@ -283,8 +283,11 @@ function showNote(msg){ note=msg; updateInfo(); }
 function clearNote(){ if(note){ note=""; updateInfo(); } }
 document.addEventListener("click",clearNote,true);
 document.addEventListener("keydown",clearNote,true);
-// 式の参照は数字に置き換え、カンマなしで
-const exprForCopy = e => e.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; });
+// コピーする文字はすべてこの形にする：参照は数字に置き換え、記号はキーボードで打てるもの（* / -）、数字はカンマなし。
+// ほかのアプリに貼って使えるように（この電卓に貼り付けるときは × ÷ − に戻して読み取る）
+const forCopy = s => s.replace(/\[(\d+)\]/g,(m,id)=>{ const h=byId(+id); return h&&isFinite(h.v) ? numLit(h.v) : "?"; })
+  .replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-");
+const numText = v => (v<0?"−":"")+plain(v);
 function copyText(text){
   const failed=()=>showNote("コピーできませんでした。");
   if(!navigator.clipboard?.writeText) return failed();
@@ -293,8 +296,8 @@ function copyText(text){
 function copyRow(kind){
   const h=byId(copying); closeMenu();
   if(!h) return;
-  if(kind==="ans"){ if(isFinite(h.v)) copyText((h.v<0?"-":"")+plain(h.v)); }
-  else copyText(exprForCopy(h.e));
+  if(kind==="ans"){ if(isFinite(h.v)) copyText(forCopy(numText(h.v))); }
+  else copyText(forCopy(h.e));
 }
 function pasteText(text){
   const x=cleanPaste(text);
@@ -312,12 +315,12 @@ document.addEventListener("copy",e=>{
   const one = sel && !selIsSym() ? expr.slice(sel.a,sel.b) : /^−?([0-9.]+|\[\d+\])$/.test(expr) ? expr : null;
   if(one){
     let v=NaN; try{ v=evaluate(one); }catch(err){}
-    if(isFinite(v)) t=(v<0?"-":"")+plain(v);
+    if(isFinite(v)) t=forCopy(numText(v));
   } else if(expr){
     // 計算できる式なら「式=答え」でコピーする（閉じていない括弧は補う。末尾が演算子などなら式だけ）
     const full=expr+")".repeat(Math.max(0,opens(expr)));
     let v=NaN; try{ v=evaluate(full); }catch(err){}
-    t = isFinite(v) ? exprForCopy(full)+"="+(v<0?"−":"")+plain(v) : exprForCopy(expr);
+    t = forCopy(isFinite(v) ? full+"="+numText(v) : expr);
   }
   if(!t) return;
   e.clipboardData.setData("text/plain",t); e.preventDefault();

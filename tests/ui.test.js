@@ -211,7 +211,7 @@ test("長押しでコピー、ボタン以外のタップは閉じるだけ", as
   await t.hold(t.row(1));
   assert.equal(await t.shown("copyBar"), true);
   await t.page.locator("#c-expr").tap();
-  assert.equal(await t.clip(), "(−15)×2+1000");
+  assert.equal(await t.clip(), "(-15)*2+1000");   // コピーはキーボードの記号で
   await t.hold(t.row(0));
   await t.page.locator("#c-ans").tap();
   assert.equal(await t.clip(), "-15");
@@ -255,7 +255,7 @@ test("Ctrl+C・Ctrl+V・キーボード", async () => {
   await page.keyboard.type("5-20");
   assert.equal(await t.expr(), "5−20");
   await page.keyboard.press("Control+C");
-  assert.equal(await t.clip(), "5−20=−15");
+  assert.equal(await t.clip(), "5-20=-15");
   await page.keyboard.press("Enter");
   assert.deepEqual(await t.answers(), ["−15"]);
   await t.setClip("3*4");

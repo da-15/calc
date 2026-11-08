@@ -81,7 +81,11 @@ test("計算して履歴に残る", async () => {
   assert.deepEqual(await t.answers(), ["3,600", "14", "220"]);
   assert.equal(await t.expr(), "");   // ＝のあと入力欄は空になる
   await t.type("8÷0");
-  assert.equal(await t.result(), "0では割れません。");
+  assert.equal(await t.result(), "");                // 計算できない式は、途中の答えを空にする
+  await t.key("=");
+  assert.equal(await t.info(), "0では割れません。"); // 理由は＝を押したときに式の段に出す
+  await t.key("⌫");
+  assert.equal(await t.info(), "");                  // 次の操作で消える
   assert.deepEqual(t.errors, []);
   await t.close();
 });
@@ -177,6 +181,24 @@ test("入力欄の記号をタップして選ぶ", async () => {
   await start("(−5)×2");
   await sym("×").tap(); await sym("×").tap();
   assert.equal(await t.page.evaluate("sel===null && pos===5"), true);   // もう一度タップでその直後にカーソル
+  await t.close();
+});
+
+test("行の編集中に＝でエラーになったら、ボタンを隠してメッセージを出す", async () => {
+  const t = await open();
+  await t.calc("12+3");
+  await t.row(0).locator(".ex").tap();
+  await t.key("÷"); await t.key("0");
+  assert.equal(await t.shown("editBar"), true);      // 入力中はボタンを出したまま
+  await t.key("=");
+  assert.equal(await t.info(), "0では割れません。");
+  assert.equal(await t.shown("editBar"), false);     // メッセージの間はボタンを隠す
+  await t.page.locator("#expr").tap();
+  assert.equal(await t.info(), "");
+  assert.equal(await t.shown("editBar"), true);
+  await t.page.evaluate(() => { setExpr("1+2)×3"); render(); });   // 「(」が足りない
+  await t.key("=");
+  assert.equal(await t.info(), "式が途中です。");
   await t.close();
 });
 

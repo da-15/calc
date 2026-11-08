@@ -20,7 +20,7 @@ const CONFIG = {
 // 端末に保存するときの名前
 const STORE = "calc-history-v2", FS_KEY = "calc-font-size";
 
-const { OPS, DIV0, isDigit, endsOperand, opens, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, cleanPaste } = Calc;
+const { OPS, isDigit, endsOperand, opens, complete, clean, fmt, plain, numLit, exprTokens, applyKey, joinRight, cleanPaste } = Calc;
 let expr = "";          // 入力中の式
 let pos = 0;            // カーソル位置
 let sel = null;         // 選択中の数字 {a,b}
@@ -139,8 +139,9 @@ function equals(){
   sel=null;
   const s=complete(expr);
   if(!s) return;
-  let v; try{ v=evaluate(s); }catch(e){ showError(e); return; }
-  if(!isFinite(v)){ showError("桁が大きすぎます。"); return; }
+  // 計算できなければ、理由を式の段に出す（次のタップかキーで消える）
+  let v; try{ v=evaluate(s); }catch(e){ showNote(e); return; }
+  if(!isFinite(v)){ showNote("桁が大きすぎます。"); return; }
   let id;
   if(editing!==null){
     const h=byId(editing); h.e=s; id=h.id; editing=null;
@@ -152,7 +153,6 @@ function equals(){
   setExpr(""); lastId=id; done=true;
   render();
 }
-function showError(msg){ el.result.className="result err"; el.result.textContent=msg; }
 
 /* ---- 行の編集 ---- */
 function startEdit(id){ closeMenu(); editing=id; setExpr(byId(id).e); done=false; historyDirty=true; render(); }
@@ -217,8 +217,8 @@ function updateBars(){
   el.parenInfo.hidden = menu;
 }
 function updateInfo(){
-  const open=opens(expr), full = editing===null && expr!=="" && history.length>=CONFIG.LIMIT;
-  el.parenInfo.textContent = note || (full ? `上限${CONFIG.LIMIT}件です。確定すると最古の行が消えます。` : open>0 ? `閉じていない括弧 ${open}` : "");
+  const full = editing===null && expr!=="" && history.length>=CONFIG.LIMIT;
+  el.parenInfo.textContent = note || (full ? `上限${CONFIG.LIMIT}件です。確定すると最古の行が消えます。` : "");
   el.parenInfo.classList.toggle("warn", note!=="" || full);
   updateBars();
 }
@@ -232,8 +232,8 @@ function render(){
   // 途中の式でも答えを先に見せる
   const s=complete(expr);
   let v=null; if(s){ try{ v=evaluate(s); }catch(e){ v=e; } }
-  if(v===DIV0) showError(v);
-  else { el.result.className="result"; el.result.textContent = typeof v==="number" ? "="+fmt(v) : ""; }
+  // 計算できない式（途中・0で割るなど）なら空にする。理由は＝を押したときに出す
+  el.result.textContent = typeof v==="number" && isFinite(v) ? "="+fmt(v) : "";
 }
 
 /* ---- 全消去の確認 ---- */

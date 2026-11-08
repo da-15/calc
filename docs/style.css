@@ -70,7 +70,6 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .expr .cur{display:inline-block;width:2px;height:1.05em;background:var(--accent);vertical-align:-2px;margin:0 -3px 0 1px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
 .result{font-weight:500;color:var(--muted)}
-.result.err{color:var(--err);font-family:var(--sans);font-size:.75em;margin-left:.4em}
 
 /* テンキー：グレーの帯にして、画面の左右と下の端まで広げる */
 .keyarea{display:flex;flex-direction:column;touch-action:none;flex:none;padding-top:2px;

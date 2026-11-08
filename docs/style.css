@@ -36,7 +36,8 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
   display:inline-block;line-height:1.3;border-radius:.35em;padding:0 .3em;cursor:pointer}
 .history .ans:active{filter:brightness(.92)}
 .history .ans.off{opacity:.45;cursor:default}
-.history .ans.bad{color:var(--err);font-family:var(--sans);font-size:.75em;cursor:default}
+/* 「エラー」は数字と見た目をそろえるため文字を3/4にする。枠の高さと余白は、ほかの答えと同じになるよう 1/0.75 倍で指定する */
+.history .ans.bad{color:var(--err);font-family:var(--sans);font-size:.75em;line-height:calc(1.3/.75);padding:0 .4em;cursor:default}
 .history .row.changed .ans{animation:flash 1.4s ease-out}
 .history .row.picked{box-shadow:inset 0 0 0 2px var(--accent)}
 @keyframes flash{0%,30%{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}}

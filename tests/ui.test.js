@@ -47,7 +47,7 @@ async function open({ width = 390, height = 760 } = {}) {
   const t = {
     page, errors,
     key: k => page.locator(`#keys [data-k="${k}"]`).tap(),
-    // テンキーで打つ（"00" "000" は1つのキーとして扱わないので、1文字ずつ）
+    // テンキーで打つ（"00" は1つのキーとして扱わないので、1文字ずつ）
     type: async s => { for (const k of s) await t.key(k); },
     calc: async s => { await t.type(s); await t.key("="); },
     expr: () => page.evaluate("expr"),
@@ -90,9 +90,9 @@ test("計算して履歴に残る", async () => {
   await t.close();
 });
 
-test("途中の答え・000・±・＝の直後の続き", async () => {
+test("途中の答え・00・±・＝の直後の続き", async () => {
   const t = await open();
-  await t.key("5"); await t.key("000");
+  await t.key("5"); await t.key("00"); await t.key("0");
   assert.equal(await t.expr(), "5000");
   assert.equal(await t.result(), "=5,000");
   await t.key("C"); await t.type("200×5"); await t.key("±");

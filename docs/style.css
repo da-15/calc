@@ -87,6 +87,7 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .keys button:active{transform:scale(.95);filter:brightness(.92)}
 .keys .op{background:var(--key-op);font-size:23px}
 .keys .zeros{font-size:18px}
+.keys [data-k="+"]{grid-row:span 2;height:auto}   /* ＋は2段ぶんの縦長（下の段の＝の右） */
 .keys .small{font-size:19px}
 .keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
 .keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}

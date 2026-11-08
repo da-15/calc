@@ -131,7 +131,8 @@ const Calc = (() => {
       return b+"(";
     }
     if(k===")"){
-      if(opens(b)<=0||L==="("||OPS.includes(L)) return null;
+      // 「(」が足りなくても打てる（＝を押したときに「( が足りません。」と知らせる）。中身のない「()」や「1+)」にはしない
+      if(L==="("||OPS.includes(L)) return null;
       return (L==="." ? b.slice(0,-1) : b)+")";
     }
     if(k==="⌫") return L==="]" ? b.replace(/\[\d+\]$/,"") : b.slice(0,-1);

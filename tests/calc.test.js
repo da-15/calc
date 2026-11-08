@@ -97,7 +97,9 @@ test("入力ルール", () => {
   assert.equal(typeKeys([..."(−×"]), "(−");          // 「(−」の−は置き換えない
   assert.equal(typeKeys([..."2("]), "2×(");          // 数字の後の括弧は×を補う
   assert.equal(typeKeys([..."(2)3"]), "(2)×3");
-  assert.equal(typeKeys([")"]), "");                 // 開いていない括弧は閉じない
+  assert.equal(typeKeys([..."1+2)"]), "1+2)");      // 「(」が足りなくても「)」は打てる
+  assert.equal(typeKeys([..."(+)"]), "(");           // 「(」や演算子の直後には打てない
+  assert.equal(typeKeys([..."1+)"]), "1+");
   assert.equal(typeKeys([..."10%%"]), "10%");
   assert.equal(typeKeys([..."12", "⌫"]), "1");
   assert.equal(Calc.applyKey("[3]", "", "⌫"), "");   // 参照は1つの単位で消える

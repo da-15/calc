@@ -55,6 +55,8 @@ test("計算できない式はメッセージを throw する", () => {
   assert.throws(() => Calc.evaluate("8÷(3−3)"), e => e === Calc.DIV0);
   assert.throws(() => Calc.evaluate("3+"), e => e === "式が途中です。");
   assert.throws(() => Calc.evaluate("(1+2"), e => e === "式が途中です。");
+  assert.throws(() => Calc.evaluate("1+2)×3"), e => e === "( が足りません。");
+  assert.throws(() => Calc.evaluate("(1+2))"), e => e === "( が足りません。");
 });
 
 test("参照 [行ID] は渡した関数で値を引く", () => {

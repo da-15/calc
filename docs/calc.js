@@ -57,7 +57,8 @@ const Calc = (() => {
       if(typeof x==="number") return x;
       if(x==="("){ const v=sum(); if(t[p]!==")") throw INCOMPLETE; p++; return v; }
       throw INCOMPLETE; }
-    const v=sum(); if(p!==t.length) throw INCOMPLETE;
+    const v=sum();
+    if(p!==t.length) throw t[p]===")" ? "( が足りません。" : INCOMPLETE;   // 「1+2)×3」のように閉じ括弧が余っている
     return v;
   }
   // 2進数の誤差を消すため、足し算・引き算の答えを元の数の桁で丸める（有効15桁）

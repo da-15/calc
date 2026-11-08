@@ -198,7 +198,7 @@ test("行の編集中に＝でエラーになったら、ボタンを隠して�
   assert.equal(await t.shown("editBar"), true);
   await t.page.evaluate(() => { setExpr("1+2)×3"); render(); });   // 「(」が足りない
   await t.key("=");
-  assert.equal(await t.info(), "式が途中です。");
+  assert.equal(await t.info(), "( が足りません。");
   await t.close();
 });
 

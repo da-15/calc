@@ -49,7 +49,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .label{font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;height:30px}
 .label.editing #exprLabel{color:var(--accent);font-weight:700}
 .lab-right{display:flex;align-items:center;gap:8px}
-#info{font-size:13px;letter-spacing:0}   /* メッセージは、同じ段のボタンの文字と同じ大きさ */
+#info{font-size:13px;font-weight:700;letter-spacing:0}   /* メッセージは、同じ段のボタンの文字と同じ大きさ・太さ */
 #info.warn{color:var(--err)}
 .bar{display:flex;align-items:center;gap:6px}
 .bar button{white-space:nowrap;appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;

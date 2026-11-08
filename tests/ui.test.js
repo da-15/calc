@@ -142,6 +142,33 @@ test("ACの確認と、履歴の保存", async () => {
   await t.close();
 });
 
+test("入力欄の記号をタップして選ぶ", async () => {
+  const t = await open();
+  const sym = ch => t.page.locator("#exprText .tok.k-sym", { hasText: ch }).first();
+  const start = s => t.page.evaluate(s => { setExpr(s); render(); }, s);
+  await start("12×5");
+  await sym("×").tap(); await t.key("÷");
+  assert.equal(await t.expr(), "12÷5");              // 演算子は演算子キーで置き換わる
+  await sym("÷").tap(); await t.key("3");
+  assert.equal(await t.expr(), "12÷35");             // それ以外のキーは直後に入る
+  await sym("÷").tap(); await t.key("⌫");
+  assert.equal(await t.expr(), "1235");              // ⌫で消すと数字はくっつく
+  await start("1+2×3");
+  await sym("+").tap(); await t.key("(");
+  assert.equal(await t.expr(), "1+(2×3");
+  await t.page.locator("#exprText .tok.k-num").last().tap(); await t.page.locator("#exprText .tok.k-num").last().tap();
+  await t.key(")");
+  assert.equal(await t.expr(), "1+(2×3)");          // 数字を2回タップすると、その直後にカーソル
+  await sym(")").tap(); await t.key("⌫");
+  assert.equal(await t.expr(), "1+(2×3");            // 括弧は選んだものだけ消える
+  await start("(−5)×2");
+  await sym("−").tap(); await t.key("+");
+  assert.equal(await t.expr(), "(−5)×2");            // 符号の−は演算子に置き換えない
+  await sym("×").tap(); await sym("×").tap();
+  assert.equal(await t.page.evaluate("sel===null && pos===5"), true);   // もう一度タップでその直後にカーソル
+  await t.close();
+});
+
 test("長押しでコピー、ボタン以外のタップは閉じるだけ", async () => {
   const t = await open();
   await t.calc("5−20");

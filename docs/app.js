@@ -94,6 +94,8 @@ function pushRow(e,v){
 
 /* ---- 入力ルール（カーソル位置 pos、選択中の数字 sel） ---- */
 function setExpr(v){ expr=v; pos=v.length; sel=null; }
+// 選んでいるのが記号（演算子・括弧・%）か。数字と参照のときは false
+const selIsSym = () => sel!==null && !/[0-9.[]/.test(expr[sel.a]);
 function press(k){
   closeMenu();
   if(!el.modal.hidden) return;
@@ -106,11 +108,17 @@ function press(k){
     if((OPS.includes(k)||k==="%"||k==="±") && expr==="" && byId(lastId)) setExpr("["+lastId+"]");
     done=false;
   }
-  if(k==="±"){ toggleSign(); return render(); }
+  if(k==="±"){
+    if(selIsSym()){ pos=sel.b; sel=null; }   // 記号を選んでいるときは、その直後で符号を扱う
+    toggleSign(); return render();
+  }
   let b, a;
   if(sel){
-    // 選択中の数字は、数字を打つと置き換わり、⌫で丸ごと消える
-    const replace = isDigit(k)||k==="."||k==="⌫";
+    // 選んだものは⌫で丸ごと消える。数字は数字キーで、演算子は演算子キーで置き換わる。
+    // それ以外のキーは、選んだものの直後に入る。符号としての−（先頭や「(」の直後）は演算子に置き換えない
+    const c=expr[sel.a], sym=selIsSym();
+    const unary = c==="−" && (sel.a===0 || expr[sel.a-1]==="(");
+    const replace = k==="⌫" || (sym ? OPS.includes(c) && OPS.includes(k) && !unary : isDigit(k)||k===".");
     b=expr.slice(0, replace ? sel.a : sel.b); a=expr.slice(sel.b); sel=null;
     if(k==="⌫"){ expr=b+a; pos=b.length; return render(); }
   } else { b=expr.slice(0,pos); a=expr.slice(pos); }
@@ -173,7 +181,7 @@ function insertRef(id){
   closeMenu();
   done=false;
   let b,a;
-  if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  if(sel){ b=expr.slice(0, selIsSym() ? sel.b : sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
   // 前後に記号がなければ「+」でつなぐ（答えを足していく使い方が多いため）
   const L=b.slice(-1);
   if(endsOperand(L)) b=(L==="." ? b.slice(0,-1) : b)+"+";
@@ -258,7 +266,7 @@ el.history.addEventListener("click",e=>{
   const a=e.target.closest("button.ans"); if(a){ insertRef(+a.dataset.id); return; }
   const x=e.target.closest(".row"); if(x) startEdit(+x.dataset.id);
 });
-// 式をタップ：数字（参照）は選択、記号はその前後にカーソル、余白は先頭か末尾へ
+// 式をタップ：数字・参照・記号は選択、余白は先頭か末尾へ
 el.expr.addEventListener("click",e=>{
   if(!el.modal.hidden) return;
   closeMenu();
@@ -267,9 +275,7 @@ el.expr.addEventListener("click",e=>{
   const t=e.target.closest(".tok");
   if(t){
     const a=+t.dataset.a, b=+t.dataset.b;
-    if(t.classList.contains("k-sym")){
-      const r=t.getBoundingClientRect(); sel=null; pos = e.clientX < r.left+r.width/2 ? a : b;
-    } else if(sel && sel.a===a && sel.b===b){ sel=null; pos=b; }
+    if(sel && sel.a===a && sel.b===b){ sel=null; pos=b; }   // 選んでいるものをもう一度タップしたら、その直後にカーソル
     else { sel={a,b}; pos=b; }
   } else {
     const r=el.exprText.querySelector(".tok")?.getBoundingClientRect();
@@ -319,7 +325,7 @@ function pasteText(text){
   if(x===null){ showNote("貼り付けできない内容です。"); return; }
   done=false;
   let b,a;
-  if(sel){ b=expr.slice(0,sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
+  if(sel){ b=expr.slice(0, selIsSym() ? sel.b : sel.a); a=expr.slice(sel.b); sel=null; } else { b=expr.slice(0,pos); a=expr.slice(pos); }
   // 式を途中に貼るときは、まとまりが崩れないよう括弧で囲む（数字1つや「10%」なら囲まない）
   const ins = /^[0-9.]+%?$/.test(x) || (b==="" && a==="") ? x : "("+x+")";
   const L=b.slice(-1), F=ins.charAt(0);
@@ -331,8 +337,8 @@ function pasteText(text){
 document.addEventListener("copy",e=>{
   if(!el.modal.hidden) return;
   let t="";
-  // 数字（参照）を選んでいるとき、または入力欄が数字1つだけのときは、その数字だけ
-  const one = sel ? expr.slice(sel.a,sel.b) : /^−?([0-9.]+|\[\d+\])$/.test(expr) ? expr : null;
+  // 数字（参照）を選んでいるとき、または入力欄が数字1つだけのときは、その数字だけ。記号を選んでいるときは式全体
+  const one = sel && !selIsSym() ? expr.slice(sel.a,sel.b) : /^−?([0-9.]+|\[\d+\])$/.test(expr) ? expr : null;
   if(one){
     let v=NaN; try{ v=evaluate(one); }catch(err){}
     if(isFinite(v)) t=(v<0?"-":"")+plain(v);

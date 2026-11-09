@@ -2,7 +2,7 @@
 /* 画面構成：上に履歴、その下に入力中の式、いちばん下に5×5のテンキー */
 :root{
   --bg:#eef0f2; --panel:#ffffff; --key:#ffffff; --key-op:#e3e9ee; --fg:#1d2730; --muted:#6c7a86;
-  --accent:#0f6e74; --accent-fg:#ffffff; --warm:#d6741f; --warm-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
+  --accent:#0f6e74; --accent-fg:#ffffff; --warm:#d47b2c; --warm-fg:#ffffff; --ghost:#b6c0c8; --err:#b3412c; --line:#d6dde3; --ref-bg:#dcefef;
   --fs:20px;   /* 履歴と入力欄の文字の大きさ（ピンチで変える） */
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,"Noto Sans JP",sans-serif;

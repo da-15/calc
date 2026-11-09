@@ -12,7 +12,7 @@
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#12171b; --panel:#192026; --key:#1f272e; --key-op:#28323a; --fg:#e7edf1; --muted:#8d9aa5;
-  --accent:#2fa7ac; --accent-fg:#06191a; --warm:#ea9953; --warm-fg:#1f1206; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
+  --accent:#2fa7ac; --accent-fg:#06191a; --warm:#e78e40; --warm-fg:#1f1206; --ghost:#4a5761; --err:#ef8a74; --line:#2a343c; --ref-bg:#173a3c; color-scheme:dark}}
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
 /* ページ全体はスクロールさせない。上下の余白は、上を表示部分、下をテンキーの帯の色で塗る */

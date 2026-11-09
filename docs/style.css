@@ -55,7 +55,6 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:va
 .bar button{white-space:nowrap;appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:10px;
   height:28px;padding:0 12px;line-height:1;font:700 13px var(--sans);cursor:pointer}
 .bar button:disabled{opacity:.45}
-.bar .del{background:var(--err);border-color:var(--err);color:var(--panel)}
 
 /* 入力中の式 */
 .expr{flex:none;cursor:text;max-height:40%;overflow-y:auto;display:flex;flex-direction:column;justify-content:flex-end;
@@ -92,8 +91,6 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .keys [data-k="+"]{grid-row:span 2;height:auto}   /* ＋は2段ぶんの縦長（4・1の段の右） */
 .keys .small{font-size:19px}
 .keys .fn{background:var(--key-op);font-family:var(--sans);font-size:16px;font-weight:700;color:var(--muted)}
-/* AC はオレンジ。＝のティールと同じ明るさ・鮮やかさにそろえた、補色寄りの色 */
-.keys .ac{background:var(--warm);border-color:var(--warm);color:var(--warm-fg)}
 .keys .eq{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-size:25px}
 .keys svg{width:26px;height:26px;display:block;margin:auto}
 @media (prefers-reduced-motion:reduce){.expr .cur,.history .row.changed .ans{animation:none}.keys-wrap{transition:none}}
@@ -107,4 +104,5 @@ body.keys-hidden .expr,body.keys-hidden .label{touch-action:none}
 .m-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .m-actions button{appearance:none;border:1px solid var(--line);background:var(--key-op);color:var(--fg);border-radius:12px;height:44px;
   font:700 15px var(--sans);cursor:pointer}
-.m-actions .danger{background:var(--err);border-color:var(--err);color:var(--panel)}
+/* 消すボタン（AC・行を削除・履歴を消す）はオレンジでそろえる。＝のティールと明るさ・鮮やかさをそろえた、補色寄りの色 */
+.keys .warm,.bar .warm,.m-actions .warm{background:var(--warm);border-color:var(--warm);color:var(--warm-fg)}
